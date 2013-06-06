@@ -209,19 +209,6 @@ if __name__ == '__main__':
     parser.add_argument(
     '-i', dest='regex', type=str, nargs="+", required=True,
     help='a list of regex values in quotes')
-
-    '''
-    # These are specific to this script
-    parser.add_argument(
-    '-b', dest='regex_begin', type=str, required=True,
-    help='a regex value to start in')
-    parser.add_argument(
-    '-i', dest='regex_int', type=str, default="",
-    help='a regex value as the intermediate state, optional')
-    parser.add_argument(
-    '-e', dest='regex_end', type=str, required=True,
-    help='a regex value to end in')
-    '''
     parser.add_argument(
     '-thres', dest='threshold', type=float, default=0.9,
     help='float from 0 to 1 that defines the occupancy % in the intermediate')
