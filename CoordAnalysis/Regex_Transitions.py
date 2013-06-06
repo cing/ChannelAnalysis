@@ -4,11 +4,11 @@
 #
 # This script parses a state stream and detects transitions that
 # satisfy a particular regular expression for the state in start,
-# intermediate, and end states. It allows short-lived transitions in
-# the intermediate state and can enforce dwell time in the end-state
-# before a valid transition is detected. This script builds on the principles
-# of the Dwell_Counter_State_Labels_VariableMem.py and
-# Dwell_Counter_State_Labels.py scripts.
+# N intermediates, and an end state. The script can exclude short-lived
+# states and function with multiple trajectory datafiles as input.
+# This script builds on the principles of the
+# Dwell_Counter_State_Labels_VariableMem.py and Dwell_Counter_State_Labels.py
+# scripts.
 #
 # Example: Given the input state stream where we intend to detect 1 2 3:
 #          3
@@ -54,7 +54,7 @@ def window(seq, size=2, fill=0, fill_left=False, fill_right=False):
         yield result
 
 # This function will extract all transitions (including fast recrossings)
-# and return a dictionary with key of type "regex_label1"-"regex_label2"
+# and return a list with key of type "regex_label1"-"regex_label2"
 # and the value is the number of those transitions observed.
 def state_transitions(data_floats, data_regex,
                       time_col=0, time_increment=1,
@@ -80,50 +80,92 @@ def state_transitions(data_floats, data_regex,
             #print N[1], Nplus1[1]
             transition_totals[str(n[2])+"-"+str(nplus1[2])] += 1
 
-    return transition_totals
+    return transition_totals.items()
 
-# This function processes a state stream and turns it into a list of the
-# format: time traj state_id time_spent_in_that_state
+# This function processes a state stream and interally turns it into a
+# list of the format: time traj state_id time_spent_in_that_state
+#
 # Using this format it is trivial to exclude low occupancy intermediates
-# and extract 3-state permeation events. It is up to the user to interpret
-# which of the 3-state events are biologically revelant and indicate a
-# permeation event.
+# and extract N-state permeation events. It is up to the user to interpret
+# which of the N-state events are biologically revelant and indicate a
+# permeation event. The intermediates parameter adjusts the N variable
+# although typically 1 is sufficient.
+# The datatype returned is a list of tuples where the first tuple index
+# is the transition id given by a sequence of hypen separated regex ids
+# and the value is the transition count.
 def state_intermediate_transitions(data_floats, data_regex,
-                      time_col=0, time_increment=1,
-                      traj_col=11, verbose=False):
+                      time_col=0, time_increment=1, intermediates=1,
+                      traj_col=11, cutoff=1, verbose=False):
 
+    # Extract the useful data out of these large lists with the traj
+    # as the key and the list as the timesteps.
+    data_paired_by_traj = defaultdict(list)
     for line, extra in zip(data_floats,data_regex):
-        data_paired.append([line[time_col],line[traj_col]]+[extra])
+        traj = line[traj_col]
+        time = line[time_col]
+        data_paired_by_traj[traj].append([time,traj,extra])
 
-    # This time we'll group the state stream into a list of lists
-    # with the magic of itertools: http://stackoverflow.com/a/7025601/1086154
-    grouped_regex = [list(g) for k, g in groupby(data_regex)]
+    data_grouped = []
+    # This time we'll group the state stream into a list of lists grouped by
+    # regex_id with the magic of itertools.groupby:
+    # http://docs.python.org/2/library/itertools.html#itertools.groupby
+    for traj, timesteps in data_paired_by_traj.iteritems():
+        for key, group in groupby(timesteps, key=lambda col: col[2]):
+            group_list = list(group)
+            group_len = len(group_list)*time_increment
 
-    for chunk in grouped_regex
+            # Here we can impose a cutoff that removes low-population
+            # states in between large intermediates.
+            if group_len > cutoff:
+                data_grouped.append(group_list[0]+[group_len])
+            #print group_list[0]+[group_len]
 
+    # Any cutoff value other than 0 will create gaps in the stream
+    # and these need to be corrected. The following block of code
+    # will look for gaps and adjust state lifetimes accordingly.
+    data_collapsed = []
+    # Make sure we have at least 1 group and then extract it's regex ID.
+    assert len(data_grouped) > 1
+    previous_group = data_grouped[0]
+    start_group = data_grouped[0]
+    temp_dwell = 0
+    for current_group in data_grouped:
+        # If there is a change of traj num since the past step
+        # then add the final dwell_time value before resetting
+        if previous_group[1] != current_group[1]:
+            temp_dwell += previous_group[3]
+            # We only take the first 3 columns because we're rewriting
+            # the last column.
+            data_collapsed.append(start_group[:3]+[temp_dwell])
+            temp_dwell = 0
+            start_group = current_group
+        # If there is a change of id since the past step
+        # use the difference in time values to correct the dwell time
+        elif previous_group[2] != current_group[2]:
+            temp_dwell += current_group[0]-previous_group[0]
+            data_collapsed.append(start_group[:3]+[temp_dwell])
+            temp_dwell = 0
+            start_group = current_group
+        else:
+            temp_dwell += current_group[0]-previous_group[0]
+            #print current_group[0], temp_dwell
+        previous_group = current_group
+
+    temp_dwell += previous_group[0]-start_group[0]
+    data_collapsed.append(start_group[:3]+[temp_dwell])
+
+    # This dictionary is returned by the function and summarizes the observed
+    # transitions.
     transition_totals = defaultdict(int)
+    # intermediates+2 is used because we have start and end states to consider
+    for group_window in window(data_collapsed,intermediates+2):
+        # n[0] is time, n[1] is traj_id, n[2] is regex_id, n[3] is dwell_time
+        group_regex_ids = [str(temp_group[2]) for temp_group in group_window]
+        # Confirm that a real transition ocurred oppossed to a back-crossing
+        if len(group_regex_ids) == len(set(group_regex_ids)):
+            transition_totals["-".join(group_regex_ids)] += 1
 
-    data_lumped = []
-    data_paired = []
-    for line, extra in zip(data_floats,data_regex):
-        data_paired.append([line[time_col],line[traj_col]]+[extra])
-
-    temp_state = 0
-    # n[0] is time, n[1] is trajectory, n[2] is regex_state
-    for n, nplus1 in window(data_paired,2):
-        if n[1]
-
-
-        if (n[1] != nplus1[1] and
-            nplus1[0] - n[0] == time_increment and
-            n[2] != nplus1[2]):
-
-            data_lumped.append([n[1]-time_entered, n[0], n[2]])
-            time_entered = nplus1[0]
-
-
-
-        data_paired.append([line[time_col],line[traj_col]]+[extra])
+    return transition_totals.items()
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -194,13 +236,14 @@ if __name__ == '__main__':
     help='the difference in the time column between steps')
     args = parser.parse_args()
 
-    data_f, data_f_padded = process_input(filenames=args.filenames,
+    data_f_padded = process_input(filenames=args.filenames,
                                           num_cols=args.num_cols,
                                           max_ions=args.max_ions,
                                           remove_frames=args.remove_frames,
                                           traj_col=args.traj_col,
                                           sort_col=args.sort_col,
-                                          add_time=args.add_time)
+                                          add_time=args.add_time,
+                                          padded=True)
 
     data_f_regex = regex_columns(data_f_padded, regex_strings=args.regex,
                                 num_cols=args.num_cols,
@@ -215,3 +258,8 @@ if __name__ == '__main__':
                             time_increment=args.time_increment,
                             traj_col=args.traj_col)
 
+    print "State Transition w/ Intermediate Counting"
+    print state_intermediate_transitions(data_f_padded, data_f_regex,
+                                         time_col=args.time_col,
+                                         time_increment=args.time_increment,
+                                         traj_col=args.traj_col)
