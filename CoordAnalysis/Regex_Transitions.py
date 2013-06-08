@@ -98,10 +98,13 @@ def state_intermediate_transitions(data_floats, data_regex,
                       time_col=0, time_increment=1, intermediates=1,
                       traj_col=11, cutoff=1, verbose=False):
 
+    # the data_regex datatype is a list of tuples: (state_label, regex_int)
+    data_regex_ids = [data[1] for data in data_regex]
+
     # Extract the useful data out of these large lists with the traj
     # as the key and the list as the timesteps.
     data_paired_by_traj = defaultdict(list)
-    for line, extra in zip(data_floats,data_regex):
+    for line, extra in zip(data_floats,data_regex_ids):
         traj = line[traj_col]
         time = line[time_col]
         data_paired_by_traj[traj].append([time,traj,extra])

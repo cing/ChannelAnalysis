@@ -38,7 +38,10 @@ def write_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
     # and the value is a list of sort values where that integer was observed.
     coord_sortvals=defaultdict(lambda: defaultdict(list))
 
-    for line, regex_state in zip(data_floats,data_regex):
+    # the data_regex datatype is a list of tuples: (state_label, regex_int)
+    data_regex_ids = [data[1] for data in data_regex]
+
+    for line, regex_state in zip(data_floats, data_regex_ids):
         traj_id = line[traj_col]
 
         for ion_index, ion in enumerate(chunker(line,num_cols)):

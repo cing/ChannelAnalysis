@@ -49,7 +49,10 @@ def regex_counter(data_floats, data_regex, traj_col=11, num_ions_map=[]):
     # count of how many times that ion count was observed.
     count_totals=defaultdict(lambda: defaultdict(int))
 
-    for line, regex_state in zip(data_floats,data_regex):
+    # the data_regex datatype is a list of tuples: (state_label, regex_int)
+    data_regex_ids = [data[1] for data in data_regex]
+
+    for line, regex_state in zip(data_floats,data_regex_ids):
         traj_id = line[traj_col]
         count_totals[traj_id][regex_state] += 1
 

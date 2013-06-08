@@ -130,7 +130,7 @@ def regex_columns(data_floats, regex_strings, num_cols=13,
                 " ".join([str(col) for col in line]))
                 count_files[len(regex_strings)].write("\n")
 
-        data_output.append(temp_bool.index(True))
+        data_output.append((temp_string, temp_bool.index(True)))
 
     # Close filestreams.
     if prefix != None:
