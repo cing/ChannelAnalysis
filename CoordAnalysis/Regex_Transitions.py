@@ -30,6 +30,7 @@
 #
 ################################################################################
 from Ion_Preprocessor import *
+from Regex_Grouping import *
 from re import match
 from argparse import ArgumentParser
 from collections import defaultdict
@@ -167,6 +168,87 @@ def state_intermediate_transitions(data_floats, data_regex,
 
     return transition_totals.items()
 
+# This function will use networkx to build a graph object of nodes, edges.
+# The state_list is a list of tuples where each tuple is a transition ID
+# and a transition count. The transition ID is a "delimited" list of state_ids
+# starting from zero. All possible states in the state_list
+# array need to be placed inside a diamond using the grid_map. grid_map is a
+# list of strings that represent positions on a 2D lattice. Anything in
+# the 2D lattice without a corresponding grid_map entry will be deleted.
+def build_transition_graph(state_edges, grid_map, pop_map=None, delim="-"):
+    try:
+        import networkx as nx
+    except ImportError:
+        print "This function requires the networkx package for graph building"
+    else:
+        # Identify the ID for unclassified data
+        skip_id = max([int(a) for i,c in state_edges for a in i.split(delim)])
+
+        transit_graph = nx.DiGraph()
+        for trans_id, count in state_edges:
+            nodes = trans_id.split(delim)
+            for node in nodes:
+                # exclude the skip_id computed above
+                if int(node) != skip_id:
+                    assert int(node) < len(grid_map)
+                    if not transit_graph.has_node(node):
+                        # pop_map stores the population of each regex state
+                        if pop_map is not None:
+                            trunc_pop = "%.1f" % (100.*pop_map[int(node)])
+                            transit_graph.add_node(node,
+                                                   pos=grid_map[int(node)],
+                                                   weight=trunc_pop)
+                        else:
+                            transit_graph.add_node(node,
+                                                   pos=grid_map[int(node)])
+
+            if (int(nodes[0]) != skip_id) and (int(nodes[-1]) != skip_id):
+                transit_graph.add_edge(nodes[0],nodes[-1], weight=count)
+
+        return transit_graph
+
+def write_transitions_graph(transit_graph, outfile="graph_regex_macro.pdf"):
+    try:
+        import networkx as nx
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print "This function requires networkx/matplotlib for graph plotting"
+    else:
+        pos=nx.get_node_attributes(transit_graph,'pos')
+        elabels=nx.get_edge_attributes(transit_graph,'weight')
+        nlabels=nx.get_node_attributes(transit_graph,'weight')
+
+        # Here we're going to add the state populations to the node labels
+        if len(nlabels) > 0:
+            for label, pop in nlabels.iteritems():
+                nlabels[label] = label + "\n(" + nlabels[label] + ")"
+
+        # Since networkx graph drawing actually kinda stinks for DiGraph's
+        # I have to make joint labels for forward and reverse edges.
+        uniq_labels={}
+        for label, count in elabels.iteritems():
+            rev_label = label[::-1]
+            #print label, rev_label, count
+            if (label not in uniq_labels) and (rev_label not in uniq_labels):
+                uniq_labels[label] = str(count)
+            elif (label not in uniq_labels) and (rev_label in uniq_labels):
+                uniq_labels[rev_label] += "/" + str(count)
+            else:
+                uniq_labels[label] += "/" + str(count)
+
+        nx.draw_networkx(transit_graph, pos,
+                         with_labels=True,
+                         node_shape='s',
+                         node_size=600,
+                         labels=nlabels,
+                         font_size=5)
+        nx.draw_networkx_edge_labels(transit_graph, pos,
+                                     edge_labels=uniq_labels,
+                                     font_size=5,
+                                     label_pos=0.40)
+        plt.axis('off')
+        plt.savefig(outfile)
+
 if __name__ == '__main__':
     parser = ArgumentParser(
     description='This script takes regex expressions for a state label\
@@ -210,12 +292,6 @@ if __name__ == '__main__':
     '-i', dest='regex', type=str, nargs="+", required=True,
     help='a list of regex values in quotes')
     parser.add_argument(
-    '-thres', dest='threshold', type=float, default=0.9,
-    help='float from 0 to 1 that defines the occupancy % in the intermediate')
-    parser.add_argument(
-    '-endmem', dest='end_memory', type=int, default=2,
-    help='float from 0 to 1 that defines the occupancy % in the intermediate')
-    parser.add_argument(
     '-timecol', dest='time_col', type=int, default=0,
     help='a zero inclusive column number with the frame/timestep number')
     parser.add_argument(
@@ -240,13 +316,36 @@ if __name__ == '__main__':
                                 max_ions=args.max_ions)
 
     print "State Transition Counting"
-    print state_transitions(data_f_padded, data_f_regex,
+    data_state_trans = state_transitions(data_f_padded, data_f_regex,
                             time_col=args.time_col,
                             time_increment=args.time_increment,
                             traj_col=args.traj_col)
 
+    print "Computing Regex State Occupancies for macrostate graph"
+    data_f_occupancy = regex_counter(data_f_padded, data_f_regex,
+                        num_ions_map=args.num_ions_map,
+                        traj_col=args.traj_col)
+    # We want to extract only the mean occupancies in percent (2nd last entry)
+    data_f_mean_pop = data_f_occupancy[-2][1:]
+
+    print "State Transition Graph Building and Writing"
+    #print data_state_trans
+    state_draw_map = [(0.0, 0),(1.0, 0),(2.0, 0),(3.0, 0),
+                          (0.5,-1),(1.5,-1),(2.5,-1),
+                               (1.0,-2),(2.0,-2),(3.0,-2),
+                                   (1.5,-3),(2.5,-3),
+                                        (2.0,-4)]
+
+    data_state_trans_graph = build_transition_graph(data_state_trans,
+                                                    state_draw_map,
+                                                    pop_map=data_f_mean_pop)
+
+    write_transitions_graph(data_state_trans_graph)
+
+    '''
     print "State Transition w/ Intermediate Counting"
     print state_intermediate_transitions(data_f_padded, data_f_regex,
                                          time_col=args.time_col,
                                          time_increment=args.time_increment,
                                          traj_col=args.traj_col)
+    '''
