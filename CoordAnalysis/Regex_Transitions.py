@@ -63,9 +63,12 @@ def state_transitions(data_floats, data_regex,
 
     transition_totals = defaultdict(int)
 
+    # the data_regex datatype is a list of tuples: (state_label, regex_int)
+    data_regex_ids = [data[1] for data in data_regex]
+
     # Extract the useful data out of these large lists
     data_paired = []
-    for line, extra in zip(data_floats,data_regex):
+    for line, extra in zip(data_floats,data_regex_ids):
         data_paired.append([line[time_col],line[traj_col]]+[extra])
 
     # n[0] is time, n[1] is trajectory, n[2] is regex_state
