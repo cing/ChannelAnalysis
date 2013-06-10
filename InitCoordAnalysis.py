@@ -102,12 +102,20 @@ def main(args):
                                    (1.5,-3),(2.5,-3),
                                         (2.0,-4)]
 
-    data_state_trans_graph = build_transition_graph(data_state_trans,
+    data_state_trans_graph = build_macrostate_graph(data_state_trans,
                                                     state_draw_map,
                                                     pop_map=data_f_mean_pop)
 
-    write_transitions_graph(data_state_trans_graph,
+    print "Macrostate Graph Writing"
+    write_macrostate_graph(data_state_trans_graph,
                             outfile=pre_prefix+"graph_regex_macro.pdf")
+
+    print "Microstate Graph Writing"
+    write_microstate_graph(data_f_padded, data_f_regex,
+                           time_col=args.time_col,
+                           time_increment=args.time_increment,
+                           traj_col=args.traj_col,
+                           outfile=pre_prefix+"graph_regex_micro.gexf")
 
     print "State Transition w/ Intermediate Counting"
     print state_intermediate_transitions(data_f_padded, data_f_regex,

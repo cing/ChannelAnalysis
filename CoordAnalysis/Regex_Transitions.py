@@ -68,8 +68,10 @@ def state_transitions(data_floats, data_regex,
 
     # Extract the useful data out of these large lists
     data_paired = []
-    for line, extra in zip(data_floats,data_regex_ids):
-        data_paired.append([line[time_col],line[traj_col]]+[extra])
+    for line, regid in zip(data_floats,data_regex_ids):
+        traj = line[traj_col]
+        time = line[time_col]
+        data_paired.append([time,traj,regid])
 
     # n[0] is time, n[1] is trajectory, n[2] is regex_state
     for n, nplus1 in window(data_paired,2):
@@ -85,6 +87,53 @@ def state_transitions(data_floats, data_regex,
             transition_totals[str(n[2])+"-"+str(nplus1[2])] += 1
 
     return transition_totals.items()
+
+# This function writes out a gexf graph file of the entire microstate network
+# which can then be visualized in Gephi.
+def write_microstate_graph(data_floats, data_regex, time_col=0,
+                           time_increment=1, traj_col=11,
+                           outfile="graph_regex_micro.gexf"):
+    try:
+        import networkx as nx
+    except ImportError:
+        print "This function requires the networkx package for graph building"
+    else:
+        micro_graph = nx.DiGraph()
+
+        # the data_regex datatype is a list of tuples: (state_label, regex_int)
+        state_labels = [data[0] for data in data_regex]
+        regex_ids = [data[1] for data in data_regex]
+
+        # Extract the useful data out of these large lists
+        data_paired = []
+        for line, regid, state in zip(data_floats, regex_ids, state_labels):
+            traj = line[traj_col]
+            time = line[time_col]
+            data_paired.append([time,traj,regid,state])
+
+        # Build nodes with dwell times data
+        for label in state_labels:
+            if micro_graph.has_node(label):
+                micro_graph.node[label]["time"] += 1
+            else:
+                micro_graph.add_node(label, time=1)
+
+        # Now loop over pairs to add connectivity.
+        # n[0] is time, n[1] is trajectory, n[2] is regex_state, n[3] is label
+        for n, nplus1 in window(data_paired,2):
+            # Verify there is no missing timestep and that the run number
+            # has not changed, also verify that it's a transition.
+            if (n[1] == nplus1[1] and
+                nplus1[0] - n[0] == time_increment and
+                n[3] != nplus1[3]):
+                if micro_graph.has_edge(n[3], nplus1[3]):
+                    micro_graph.edge[n[3]][nplus1[3]]["weight"] += 1
+                else:
+                    micro_graph.add_edge(n[3], nplus1[3], weight=1)
+
+        nx.write_gexf(micro_graph, outfile)
+
+    return micro_graph
 
 # This function processes a state stream and interally turns it into a
 # list of the format: time traj state_id time_spent_in_that_state
@@ -107,10 +156,10 @@ def state_intermediate_transitions(data_floats, data_regex,
     # Extract the useful data out of these large lists with the traj
     # as the key and the list as the timesteps.
     data_paired_by_traj = defaultdict(list)
-    for line, extra in zip(data_floats,data_regex_ids):
+    for line, regid in zip(data_floats,data_regex_ids):
         traj = line[traj_col]
         time = line[time_col]
-        data_paired_by_traj[traj].append([time,traj,extra])
+        data_paired_by_traj[traj].append([time,traj,regid])
 
     data_grouped = []
     # This time we'll group the state stream into a list of lists grouped by
@@ -181,7 +230,7 @@ def state_intermediate_transitions(data_floats, data_regex,
 # array need to be placed inside a diamond using the grid_map. grid_map is a
 # list of strings that represent positions on a 2D lattice. Anything in
 # the 2D lattice without a corresponding grid_map entry will be deleted.
-def build_transition_graph(state_edges, grid_map, pop_map=None, delim="-"):
+def build_macrostate_graph(state_edges, grid_map, pop_map=None, delim="-"):
     try:
         import networkx as nx
     except ImportError:
@@ -190,39 +239,39 @@ def build_transition_graph(state_edges, grid_map, pop_map=None, delim="-"):
         # Identify the ID for unclassified data
         skip_id = max([int(a) for i,c in state_edges for a in i.split(delim)])
 
-        transit_graph = nx.DiGraph()
+        macro_graph = nx.DiGraph()
         for trans_id, count in state_edges:
             nodes = trans_id.split(delim)
             for node in nodes:
                 # exclude the skip_id computed above
                 if int(node) != skip_id:
                     assert int(node) < len(grid_map)
-                    if not transit_graph.has_node(node):
+                    if not macro_graph.has_node(node):
                         # pop_map stores the population of each regex state
                         if pop_map is not None:
                             trunc_pop = "%.1f" % (100.*pop_map[int(node)])
-                            transit_graph.add_node(node,
+                            macro_graph.add_node(node,
                                                    pos=grid_map[int(node)],
                                                    weight=trunc_pop)
                         else:
-                            transit_graph.add_node(node,
+                            macro_graph.add_node(node,
                                                    pos=grid_map[int(node)])
 
             if (int(nodes[0]) != skip_id) and (int(nodes[-1]) != skip_id):
-                transit_graph.add_edge(nodes[0],nodes[-1], weight=count)
+                macro_graph.add_edge(nodes[0],nodes[-1], weight=count)
 
-        return transit_graph
+        return macro_graph
 
-def write_transitions_graph(transit_graph, outfile="graph_regex_macro.pdf"):
+def write_macrostate_graph(macro_graph, outfile="graph_regex_macro.pdf"):
     try:
         import networkx as nx
         import matplotlib.pyplot as plt
     except ImportError:
         print "This function requires networkx/matplotlib for graph plotting"
     else:
-        pos=nx.get_node_attributes(transit_graph,'pos')
-        elabels=nx.get_edge_attributes(transit_graph,'weight')
-        nlabels=nx.get_node_attributes(transit_graph,'weight')
+        pos=nx.get_node_attributes(macro_graph,'pos')
+        elabels=nx.get_edge_attributes(macro_graph,'weight')
+        nlabels=nx.get_node_attributes(macro_graph,'weight')
 
         # Here we're going to add the state populations to the node labels
         if len(nlabels) > 0:
@@ -242,13 +291,13 @@ def write_transitions_graph(transit_graph, outfile="graph_regex_macro.pdf"):
             else:
                 uniq_labels[label] += "/" + str(count)
 
-        nx.draw_networkx(transit_graph, pos,
+        nx.draw_networkx(macro_graph, pos,
                          with_labels=True,
                          node_shape='s',
                          node_size=600,
                          labels=nlabels,
                          font_size=5)
-        nx.draw_networkx_edge_labels(transit_graph, pos,
+        nx.draw_networkx_edge_labels(macro_graph, pos,
                                      edge_labels=uniq_labels,
                                      font_size=5,
                                      label_pos=0.40)
@@ -334,7 +383,7 @@ if __name__ == '__main__':
     # We want to extract only the mean occupancies in percent (2nd last entry)
     data_f_mean_pop = data_f_occupancy[-2][1:]
 
-    print "State Transition Graph Building and Writing"
+    print "State Transition Graph Building"
     #print data_state_trans
     state_draw_map = [(0.0, 0),(1.0, 0),(2.0, 0),(3.0, 0),
                           (0.5,-1),(1.5,-1),(2.5,-1),
@@ -342,11 +391,18 @@ if __name__ == '__main__':
                                    (1.5,-3),(2.5,-3),
                                         (2.0,-4)]
 
-    data_state_trans_graph = build_transition_graph(data_state_trans,
+    data_state_trans_graph = build_macrostate_graph(data_state_trans,
                                                     state_draw_map,
                                                     pop_map=data_f_mean_pop)
 
-    write_transitions_graph(data_state_trans_graph)
+    print "Macrostate Graph Writing"
+    write_macrostate_graph(data_state_trans_graph)
+
+    print "Microstate Graph Writing"
+    write_microstate_graph(data_f_padded, data_f_regex,
+                           time_col=args.time_col,
+                           time_increment=args.time_increment,
+                           traj_col=args.traj_col)
 
     '''
     print "State Transition w/ Intermediate Counting"
