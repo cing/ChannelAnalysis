@@ -13,15 +13,14 @@
 #          The following command would remove 2000 lines from the input
 #          and produce a large number of 1D Histograms to be plotted
 #          in an external plotting program:
-#          python Coordination_Histograms.py -f f1.out -m 3 -c 13 
-#                                            -remove 2000 
+#          python Coordination_Histograms.py -f f1.out -m 3 -c 13
+#                                            -remove 2000
 #                                            -coord 4 5 6 7 8 9 10
 #
 # By Chris Ing, 2013 for Python 2.7
 #
 ###############################################################################
 from argparse import ArgumentParser
-from collections import defaultdict
 from numpy import histogram, histogram2d, log
 from Rotamer_Preprocessor import *
 
