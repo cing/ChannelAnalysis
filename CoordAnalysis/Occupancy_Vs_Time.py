@@ -166,13 +166,18 @@ def write_occ_vs_time(data_lines, num_cols=13,
                 if traj_id not in count_files:
                     count_files[traj_id] = \
                                  open(prefix+"_occupancy_n"+str(traj_id),"w")
-                else:
-                    count_files[traj_id].write(str(ion[0])+" "+
-                                               str(traj_id)+" "+
-                                               str(temp_ion_count)+
-                                               "\n")
+                count_files[traj_id].write(str(ion[0])+" "+
+                                           str(traj_id)+" "+
+                                           str(temp_ion_count)+
+                                           "\n")
             else:
                 print line[0], traj_id, temp_ion_count
+
+    # Close filestreams.
+    if prefix != None:
+        for key in count_files.keys():
+            count_files[key].close()
+
     return True
 
 
