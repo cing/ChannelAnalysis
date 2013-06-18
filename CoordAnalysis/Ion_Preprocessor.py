@@ -305,43 +305,40 @@ def process_input(filenames, sort_col=3, num_cols=13,
             data_raw = data_file.readlines()[remove_frames:]
             data_raw_split = [line.strip().split() for line in data_raw]
 
-            prev_time = None
+        # Newer versions of my MDAnalysis code don't require adding a time
+        # column (in past version only time[0] contained the timestep)
+        if add_time:
+            data_raw_split = add_time_column(data_raw_split, num_cols=num_cols)
+
+        prev_time = None
+        for line in data_raw_split:
+            if (len(line) > traj_col) and (len(line) > time_col):
+                prev_time = int(float(data_raw_split[0][time_col]))
+                prev_traj = int(float(data_raw_split[0][traj_col]))
+        # This is basically a check to see if this datafile has any
+        # ion coordination. If not, skip it!
+        if prev_time != None:
+            # Now loop over the data and convert everything to integer
+            # except the float_cols columns.
             for line in data_raw_split:
-                if (len(line) > traj_col) and (len(line) > time_col):
-                    prev_time = int(float(data_raw_split[0][time_col]))
-                    prev_traj = int(float(data_raw_split[0][traj_col]))
-
-            # This is basically a check to see if this datafile has any
-            # ion coordination. If not, skip it!
-            if prev_time != None:
-                # Now loop over the data and convert everything to integer
-                # except the float_cols columns.
-                for line in data_raw_split:
-                    temp_line = []
-                    for colindex, colvalue in enumerate(line):
-                        if (float_cols.count(colindex) > 0 or
-                            float_cols.count(colindex % num_cols) > 0):
-                            temp_line.append(float(colvalue))
-                        else:
-                            temp_line.append(int(float(colvalue)))
-
-                    # This "pads" zero ion columns with a fake ion.
-                    if len(temp_line) > 1:
-                        data_floats.append(temp_line)
-                        prev_time = int(float(line[time_col]))
-                        prev_traj = int(float(line[traj_col]))
+                temp_line = []
+                for colindex, colvalue in enumerate(line):
+                    if (float_cols.count(colindex) > 0 or
+                        float_cols.count(colindex % num_cols) > 0):
+                        temp_line.append(float(colvalue))
                     else:
-                        data_floats.append([prev_time + time_increment] +
-                                           [0.,0.,0.] +
-                                           ["-" for x in range(num_cols-7)] +
-                                           [0,prev_traj,0])
-                        prev_time += time_increment
-
-    # Newer versions of my MDAnalysis code don't require adding a time
-    # column (in past version only time[0] contained the timestep)
-    if add_time:
-        data_floats = add_time_column(data_floats,
-                                      num_cols=num_cols)
+                        temp_line.append(int(float(colvalue)))
+                # This "pads" zero ion columns with a fake ion.
+                if len(temp_line) > 1:
+                    data_floats.append(temp_line)
+                    prev_time = int(float(line[time_col]))
+                    prev_traj = int(float(line[traj_col]))
+                else:
+                    data_floats.append([prev_time + time_increment] +
+                                       [0.,0.,0.] +
+                                       ["-" for x in range(num_cols-7)] +
+                                       [0,prev_traj,0])
+                    prev_time += time_increment
 
     # TODO: Write something to remove duplicate lines.
 
