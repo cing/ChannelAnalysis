@@ -29,8 +29,8 @@ from Ion_Preprocessor import *
 # coordination counts.
 def write_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
                           num_cols=13,
-                          sort_col=3, pad_col=4, histmin=-1.00, histmax=1.5,
-                          histbins=250, prefix="1dhisto"):
+                          sort_col=3, pad_col=4, histmin=-1.50, histmax=1.5,
+                          histbins=300, prefix="1dhisto"):
 
     # This is an epic datatype with the 1st key as the coordination column
     # of interest, the 2nd key is the integer coordination of interest
@@ -75,8 +75,8 @@ def write_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
 # 5) -----------    (all ions with coordination, sum of 1,2,3 above) as ++
 def write_group_coord_histograms(data_lines, sf_col=[5,6],
                           num_cols=13,
-                          sort_col=3, pad_col=4, histmin=-1.00, histmax=1.5,
-                          histbins=250, prefix="1dhisto"):
+                          sort_col=3, pad_col=4, histmin=-1.50, histmax=1.5,
+                          histbins=300, prefix="1dhisto"):
 
     # This is a datatype where the 1st key is the coordination group id
     # and the value is a list of values where that group id was observed.
