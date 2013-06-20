@@ -7,7 +7,7 @@
 # fitting. This script in particular prepares a list of lists datatype
 # that will be used as intput for these rotameric analysis functions.
 #
-# Example: For 13/26/39/...-column data with this type (describe elsewhere):
+# Example: For 10-column data with this type (described elsewhere):
 #          24.0 170.2 63.7 -74.5 -74.4 -143.9 -88.4 -143.6 -73.7 10.0
 #          25.0 157.4 78.0 -88.5 -73.3 -144.4 -73.7 -151.2 -55.1 10.0
 #
@@ -50,7 +50,7 @@ def window(seq, size=2, fill=0, fill_left=False, fill_right=False):
 # The meat of the file processing, nothing fancy though, just shifting
 # negative degrees to positive in the range of 0-360. Chi2 columns
 # is actually optional if your sidechain doesn't have it just omit.
-def process_dunking(filenames, chi1_cols, chi2_cols=[],
+def process_rotamers(filenames, chi1_cols, chi2_cols=[],
                     remove_frames=0, traj_col=11, time_col=0):
 
     # The output list
@@ -153,7 +153,7 @@ if __name__ == '__main__':
     help='the file to output the sorted padding output of all input files')
     args = parser.parse_args()
 
-    data_f_dunk = process_dunking(filenames=args.filenames,
+    data_f_dunk = process_rotamers(filenames=args.filenames,
                                   chi1_cols=args.chi1_cols,
                                   chi2_cols=args.chi2_cols,
                                   remove_frames=args.remove_frames,

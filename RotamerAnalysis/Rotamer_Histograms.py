@@ -7,15 +7,16 @@
 # since it makes 2D histograms as well, but I didn't feel like changing my
 # naming convention.
 #
-# Example: For 13/26/39/...-column data with type like:
-#          1.0 -0.13 -0.193 0.522 0.0 1.0 0.0 0.0 0.0 2.0 9.0 2.0 1748.0
+# Example: For 10-column data with this type (described elsewhere):
+#          24.0 170.2 63.7 -74.5 -74.4 -143.9 -88.4 -143.6 -73.7 10.0
+#          25.0 157.4 78.0 -88.5 -73.3 -144.4 -73.7 -151.2 -55.1 10.0
 #
 #          The following command would remove 2000 lines from the input
 #          and produce a large number of 1D Histograms to be plotted
 #          in an external plotting program:
-#          python Coordination_Histograms.py -f f1.out -m 3 -c 13
-#                                            -remove 2000
-#                                            -coord 4 5 6 7 8 9 10
+#          python Rotamer_Histograms.py -f f1.out f2.out -t 9
+#                                         -x1 0 2 3 4 -x2 1 3 4 5
+#                                         -remove 2000
 #
 # By Chris Ing, 2013 for Python 2.7
 #
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     help='the file to output the sorted padding output of all input files')
     args = parser.parse_args()
 
-    data_f_dunk = process_dunking(filenames=args.filenames,
+    data_f_dunk = process_rotamers(filenames=args.filenames,
                                   chi1_cols=args.chi1_cols,
                                   chi2_cols=args.chi2_cols,
                                   remove_frames=args.remove_frames,
