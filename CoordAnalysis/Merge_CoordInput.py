@@ -50,32 +50,56 @@ def write_merged_coordination(filenames, coord_cols, outfile=None,
             total_lines += len(data_raw)
             data_raw_split = [line.strip().split() for line in data_raw]
 
+            # This is a traj_id detection script, we're going to pray
+            # that the file input only has 1 traj_id in it or else
+            # you're getting a bug.
+            auto_traj = None
+            for line in data_raw_split:
+                if (len(line) > traj_col) and (len(line) > time_col):
+                    auto_traj = int(float(line[traj_col]))
+
             # Now loop over the data and convert everything to integer
             # except the float_cols columns.
             for line in data_raw_split:
                 # Loop over all ion's at that timestep
                 for ion in chunker(line,num_cols):
-                    # Prepare a unique identifier for that line, if you
-                    # have more than 9999 trajectories or 99999999 frames
-                    # then your data may not be correctly sorted since
-                    # the identifier is a string and must be sorted
-                    # alphanumerically at the end of the function.
-                    u_id = ion[traj_col].split(".")[0].zfill(traj_digits)+\
-                           ion[time_col].split(".")[0].zfill(time_digits)
-                    #print u_id
-                    resid = int(float(ion[resid_col]))
-
-                    # If that resid exists already, add the coord_cols
-                    if resid in merged_coord[u_id]:
-                        old_ion = merged_coord[u_id][resid]
-                        for coord_col in coord_cols:
-                            old_coord = float(old_ion[coord_col])
-                            new_coord = float(ion[coord_col])
-                            old_ion[coord_col] = str(old_coord + new_coord)
-                        merged_coord[u_id][resid] = old_ion
-                    # Otherwise, just create it.
+                    # The default behavior is to read the column traj_id
+                    # but in the case that it doesn't exist, use the auto
+                    #
+                    if (len(line) > traj_col) and (len(line) > time_col):
+                        # Prepare a unique identifier for that line, if you
+                        # have more than 9999 trajectories or 99999999 frames
+                        # then your data may not be correctly sorted since
+                        # the identifier is a string and must be sorted
+                        # alphanumerically at the end of the function.
+                        u_id = ion[traj_col].split(".")[0].zfill(traj_digits)+\
+                               ion[time_col].split(".")[0].zfill(time_digits)
+                    elif auto_traj is not None:
+                        u_id = str(auto_traj).zfill(traj_digits)+\
+                               ion[time_col].split(".")[0].zfill(time_digits)
                     else:
-                        merged_coord[u_id][resid] = ion
+                        raise ValueError("You input a file with no traj_id")
+
+                    if len(line) > resid_col:
+                        resid = int(float(ion[resid_col]))
+
+                        # If that resid exists already, add the coord_cols
+                        if resid in merged_coord[u_id]:
+                            old_ion = merged_coord[u_id][resid]
+                            for coord_col in coord_cols:
+                                old_coord = float(old_ion[coord_col])
+                                new_coord = float(ion[coord_col])
+                                old_ion[coord_col] = str(old_coord + new_coord)
+                            merged_coord[u_id][resid] = old_ion
+                        # Otherwise, just create it.
+                        else:
+                            merged_coord[u_id][resid] = ion
+                    else:
+                        # In the case that no resid exists, a dictionary entry
+                        # for the u_id should still be made. Though these
+                        # lines will basically contribute nothing other than
+                        # channel occupancy calculations.
+                        merged_coord[u_id][""] = ion
 
     # It's entirely possible that the output may have more lines than the input
     # since we're doing a union of the two sets.

@@ -313,8 +313,9 @@ def process_input(filenames, sort_col=3, num_cols=13,
         prev_time = None
         for line in data_raw_split:
             if (len(line) > traj_col) and (len(line) > time_col):
-                prev_time = int(float(data_raw_split[0][time_col]))
-                prev_traj = int(float(data_raw_split[0][traj_col]))
+                prev_time = int(float(line[time_col]))
+                prev_traj = int(float(line[traj_col]))
+
         # This is basically a check to see if this datafile has any
         # ion coordination. If not, skip it!
         if prev_time != None:
@@ -334,6 +335,9 @@ def process_input(filenames, sort_col=3, num_cols=13,
                     prev_time = int(float(line[time_col]))
                     prev_traj = int(float(line[traj_col]))
                 else:
+                    # TODO: There's a bug here when prev_time is
+                    # detected above as being half-way through a
+                    # file.
                     data_floats.append([prev_time + time_increment] +
                                        [0.,0.,0.] +
                                        ["-" for x in range(num_cols-7)] +
