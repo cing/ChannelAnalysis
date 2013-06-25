@@ -62,7 +62,7 @@ def add_time_column(data_floats, num_cols=13, verbose=False):
 # that are returned from sort_columns and pad_columns functions.
 def regex_columns(data_floats, regex_strings, num_cols=13,
                   pad_col=4, sf_col=[5,6], sort_col=3, sort_cut=0.0,
-                  max_ions=3, prefix=None):
+                  max_ions=3, max_coord=9, prefix=None):
 
     data_output = []
 
@@ -96,11 +96,19 @@ def regex_columns(data_floats, regex_strings, num_cols=13,
                 temp_label.extend("-"*len(sf_col))
             num_ions += 1
 
+        # Here's a fix for when coordination integer counts are too large
+        # and it ruins the fixed number of digit state label paradigm that
+        # is critical for regex matching.
+        for digit_index, digit in enumerate(temp_label):
+            if digit != "-" and digit > max_coord:
+                temp_label[digit_index] = max_coord
+
         for filler in range(max_ions-num_ions):
             temp_label.extend("-"*len(sf_col))
 
         # Convert the label list to a string of length max_ions*len(sf_cols)
         temp_string = "".join([str(coord) for coord in temp_label])
+        assert len(temp_string) == max_ions*len(sf_col)
 
         temp_bool = []
         for regex_id, regex in enumerate(regex_strings):
@@ -428,7 +436,12 @@ if __name__ == '__main__':
                                 sf_col=args.sf_col,
                                 max_ions=args.max_ions)
 
-    #for x,y in zip(data_f_label, data_f_regex):
-    #    print x,y
+    '''
+    for x,y in zip(data_f_padded, data_f_regex):
+        print x,y, len(y[0])
+        if len(y[0]) > args.max_ions*len(args.sf_col):
+            raise ValueError("State label is too long, possible bug")
+    '''
+
     #write_columns(data_f_padded, outfile=args.outfile)
 
