@@ -27,15 +27,20 @@ from Ion_Preprocessor import *
 # coordination they have, grouping them into a list for generating
 # multiple 1D Histograms. coord_cols is a list of columns that contain
 # coordination counts.
-def write_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
-                          num_cols=13,
-                          sort_col=3, pad_col=4, histmin=-1.50, histmax=1.5,
-                          histbins=300, prefix="1dhisto"):
+def compute_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
+                             num_cols=13,
+                             sort_col=3, pad_col=4, histmin=-1.50, histmax=1.5,
+                             histbins=300, prefix=None):
 
     # This is an epic datatype with the 1st key as the coordination column
     # of interest, the 2nd key is the integer coordination of interest
     # and the value is a list of values where that integer was observed.
     coord_sortvals=defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of dictionaries where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_col = defaultdict(list)
+    z_per_col = defaultdict(list)
 
     for line in data_lines:
         for ion in chunker(line,num_cols):
@@ -57,13 +62,17 @@ def write_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
             histo, edges = histogram(sort_vals, range=[histmin, histmax],
                                      bins=histbins, normed=False)
 
-            with open(prefix+"_coordcol"+str(coord_col)+
-                             "_coordint"+str(coord_int),"w") as out:
-                for xval, yval in zip(edges,histo):
-                    out.write(str(xval)+" "+str(yval)+"\n")
+            if prefix != None:
+                with open(prefix+"_coordcol"+str(coord_col)+
+                                 "_coordint"+str(coord_int),"w") as out:
+                    for xval, yval in zip(edges,histo):
+                        out.write(str(xval)+" "+str(yval)+"\n")
 
-    # TODO: Return data that can be plotted by matplotlib
-    return True
+            coord_hist_per_col[str(coord_col)+
+                               "_"+str(coord_int)].append(histo)
+            z_per_col[str(coord_col)+"_"+str(coord_int)].append(edges)
+
+    return (coord_hist_per_col.items(), z_per_col.items())
 
 # similar to above, but this script groups the data based on zero
 # and non-zero values of the passed coord_cols. For example,
@@ -73,14 +82,19 @@ def write_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
 # 3) 5: 0,  6: >0   (col6 coordination only) as file suffix 01
 # 4) 5: 0,  6: 0    (col5 and col6 no coordination) as file suffice 00
 # 5) -----------    (all ions with coordination, sum of 1,2,3 above) as ++
-def write_group_coord_histograms(data_lines, sf_col=[5,6],
-                          num_cols=13,
-                          sort_col=3, pad_col=4, histmin=-1.50, histmax=1.5,
-                          histbins=300, prefix="1dhisto"):
+def compute_group_coord_histograms(data_lines, sf_col=[5,6],
+                                   num_cols=13,
+                                   sort_col=3, pad_col=4, histmin=-1.50,
+                                   histmax=1.5, histbins=300, prefix=None):
 
     # This is a datatype where the 1st key is the coordination group id
     # and the value is a list of values where that group id was observed.
     coord_sortvals=defaultdict(list)
+
+    # These are dictionaries of dictionaries where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_col = defaultdict(list)
+    z_per_col = defaultdict(list)
 
     for line in data_lines:
         for ion in chunker(line,num_cols):
@@ -103,11 +117,16 @@ def write_group_coord_histograms(data_lines, sf_col=[5,6],
     for group_id, sort_vals in coord_sortvals.iteritems():
         histo, edges = histogram(sort_vals, range=[histmin, histmax],
                                  bins=histbins, normed=False)
-        with open(prefix+"_groupcoord"+str(group_id),"w") as out:
-            for xval, yval in zip(edges,histo):
-                out.write(str(xval)+" "+str(yval)+"\n")
 
-    return True
+        if prefix != None:
+            with open(prefix+"_groupcoord"+str(group_id),"w") as out:
+                for xval, yval in zip(edges,histo):
+                    out.write(str(xval)+" "+str(yval)+"\n")
+
+        coord_hist_per_col[str(group_id)].append(histo)
+        z_per_col[str(group_id)].append(edges)
+
+    return (coord_hist_per_col.items(), z_per_col.items())
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -155,11 +174,11 @@ if __name__ == '__main__':
                                           add_time=args.add_time)
 
     print "Writing multiple 1D histograms for ion coordination integers"
-    write_coord_histograms(data_f, coord_cols=args.coord_cols,
-                          num_cols=args.num_cols,
-                          sort_col=args.sort_col, prefix=args.prefix)
+    print compute_coord_histograms(data_f, coord_cols=args.coord_cols,
+                             num_cols=args.num_cols,
+                             sort_col=args.sort_col, prefix=args.prefix)
 
     print "Writing multiple 1D histograms for zero or non-zero coordination"
-    write_group_coord_histograms(data_f, sf_col=args.sf_col,
-                          num_cols=args.num_cols,
-                          sort_col=args.sort_col, prefix=args.prefix)
+    print compute_group_coord_histograms(data_f, sf_col=args.sf_col,
+                                   num_cols=args.num_cols,
+                                   sort_col=args.sort_col, prefix=args.prefix)

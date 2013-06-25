@@ -71,13 +71,22 @@ def process_state_lifetimes(data_lines, data_states, traj_col=11):
 # and there is a gradual decay from there at subsequent timesteps.
 # time_output_conv is a conversion from the units of the input to the output
 # units (often nanoseconds)
-def write_rotamer_state_survival(data_lines, data_states, survival_cut=600,
+def compute_rotamer_state_survival(data_lines, data_states, survival_cut=600,
                                  traj_col=11, time_output_conv=0.02,
                                  prefix="1dhisto_rotamer_survival"):
 
+    # These are dictionaries of dictionaries where the key is a state-id
+    # and the list is a survival probability or associated time
+    survival_per_state = defaultdict(list)
+    time_per_state = defaultdict(list)
+
+    # This helper function does some fancy magic on rotamer streams to
+    # speed up processing.
     data_grouped = process_state_lifetimes(data_lines, data_states, traj_col)
 
-    fit_values = []
+    # This includes the details of the exponential fitting to be returned
+    fit_statistics = []
+
     for state_id, lifetimes in data_grouped.items():
         # Here we make a quick 1D histogram with a bin for every
         # discrete value. Since it's a survival probability, we
@@ -95,10 +104,16 @@ def write_rotamer_state_survival(data_lines, data_states, survival_cut=600,
 
         # For each of the states, print the output and normalize
         # that badboy.
-        with open(prefix+"_state"+str(state_id),"w") as out:
-            for survival_time, population in enumerate(histo):
-                out.write(str(survival_time*time_output_conv)+" "
-                          +str(population)+"\n")
+        if prefix != None:
+            with open(prefix+"_state"+str(state_id),"w") as out:
+                for survival_time, population in enumerate(histo):
+                    out.write(str(survival_time*time_output_conv)+" "
+                              +str(population)+"\n")
+
+        # Save the histogram for returning later
+        for time, population in enumerate(histo):
+            survival_per_state[str(state_id)+"_raw"].append(population)
+            time_per_state[str(state_id)+"_raw"].append(time*time_output_conv)
 
         # These are input values that assume a 0.1, 1, 10 nanosecond timescale
         a = 0.33
@@ -121,17 +136,22 @@ def write_rotamer_state_survival(data_lines, data_states, survival_cut=600,
         #yy = double_exp_func(x, *popt)
 
         # For each of the fitting states, print 'er out.
-        with open(prefix+"_statefit"+str(state_id),"w") as out:
-            for survival_time, population in enumerate(yy):
-                out.write(str(survival_time*time_output_conv)+" "
-                          +str(population)+"\n")
+        if prefix != None:
+            with open(prefix+"_statefit"+str(state_id),"w") as out:
+                for survival_time, population in enumerate(yy):
+                    out.write(str(survival_time*time_output_conv)+" "
+                              +str(population)+"\n")
+
+        # Save the histogram for returning later
+        survival_per_state[str(state_id)+"_fit"].extend(yy)
+        time_per_state[str(state_id)+"_fit"].extend(list(x))
 
         # Though we could use linregress to obtain R^2, correlation suffices
         fit_correlation = np.corrcoef(histo, yy)[0][1]
-        fit_values.append((list(popt),list(np.sqrt(pcov.diagonal())),
+        fit_statistics.append((list(popt),list(np.sqrt(pcov.diagonal())),
                            fit_correlation))
 
-    return fit_values
+    return (survival_per_state.items(), time_per_state.items(), fit_statistics)
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -171,5 +191,5 @@ if __name__ == '__main__':
     data_f_states = label_states(data_f_dunk, args.chi2_cols, args.dividers)
 
     print "Writing rotamer survival states for plotting", args.dividers
-    print write_rotamer_state_survival(data_f_dunk, data_f_states,
+    print compute_rotamer_state_survival(data_f_dunk, data_f_states,
                                        traj_col=args.traj_col)

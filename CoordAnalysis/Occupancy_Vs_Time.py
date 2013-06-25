@@ -41,11 +41,11 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
     # dict of dicts where the 1st key is a trajectory number
     # and the second key is the ion count and the value is a
     # count of how many times that ion count was observed.
-    count_totals=defaultdict(lambda: defaultdict(int))
+    count_totals = defaultdict(lambda: defaultdict(int))
 
     # This a dictionary of file streams that will be used for output
     # when prefix is assigned.
-    count_files={}
+    count_files = {}
 
     for line in data_lines:
         traj_id = line[traj_col]
@@ -147,11 +147,12 @@ def compute_occ_vs_time(data_lines, num_cols=13,
 
     # This a dictionary of file streams that will be used for output
     # when prefix is assigned.
-    count_files={}
+    count_files = {}
 
-    # This is a dictionary of dictionaries where the key is a trajectory
-    # number and the list is the computed occupancy count
-    occ_per_traj_vs_time=defaultdict(list)
+    # These are dictionaries of dictionaries where the key is a trajectory
+    # number and the list is the computed occupancy count, or frame number
+    occ_per_traj = defaultdict(list)
+    time_per_traj = defaultdict(list)
 
     for line in data_lines:
         traj_id = line[traj_col]
@@ -175,14 +176,15 @@ def compute_occ_vs_time(data_lines, num_cols=13,
                                            str(temp_ion_count)+
                                            "\n")
 
-            occ_per_traj_vs_time[traj_id].append(temp_ion_count)
+            occ_per_traj[traj_id].append(temp_ion_count)
+            time_per_traj[traj_id].append(float(ion[0]))
 
     # Close filestreams.
     if prefix != None:
         for key in count_files.keys():
             count_files[key].close()
 
-    return occ_per_traj_vs_time.items()
+    return (occ_per_traj.items(), time_per_traj.items())
 
 
 if __name__ == '__main__':

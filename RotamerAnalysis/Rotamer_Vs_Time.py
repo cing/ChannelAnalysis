@@ -40,7 +40,7 @@ def rotamer_counter_per_res(data_lines, data_states, traj_col=11, prefix=None):
     # dict of dicts where the 1st key is a trajectory number
     # and the second key is the ion count and the value is a
     # count of how many times that ion count was observed.
-    count_totals=defaultdict(lambda: defaultdict(int))
+    count_totals = defaultdict(lambda: defaultdict(int))
 
     # This is the return list in the format:
     # traj_id d/u_ratio uncertainty
@@ -85,7 +85,7 @@ def rotamer_counter(data_lines, data_states, traj_col=11, prefix=None):
     # dict of dicts where the 1st key is a trajectory number
     # and the second key is the ion count and the value is a
     # count of how many times that ion count was observed.
-    count_totals=defaultdict(lambda: defaultdict(int))
+    count_totals = defaultdict(lambda: defaultdict(int))
 
     for line, states in zip(data_lines, data_states):
         traj_id = line[traj_col]
@@ -155,11 +155,16 @@ def count_totals_to_percents(count_totals, num_ions_map=[]):
 
 # This writes the total of all rotamer states as a function of time
 # for use of time series plotting purposes.
-def write_rotamer_vs_time(data_lines, data_states, traj_col, prefix=None):
+def compute_rotamer_vs_time(data_lines, data_states, traj_col, prefix=None):
 
     # This a dictionary of file streams that will be used for output
     # when prefix is assigned.
-    count_files={}
+    count_files = {}
+
+    # These are dictionaries of dictionaries where the key is a trajectory
+    # number and the list is the computed occupancy count, or frame number
+    rotstate_per_traj = defaultdict(list)
+    time_per_traj = defaultdict(list)
 
     # This is an epic datatype that I will use to quickly build a
     # dict of dicts where the 1st key is a trajectory number
@@ -180,15 +185,16 @@ def write_rotamer_vs_time(data_lines, data_states, traj_col, prefix=None):
                                            str(traj_id)+" "+
                                            str(state_total)+
                                            "\n")
-        else:
-            print line[0], traj_id, state_total
+
+        rotstate_per_traj[traj_id].append(state_total)
+        time_per_traj[traj_id].append(float(line[0]))
 
     # Close filestreams.
     if prefix != None:
         for key in count_files.keys():
             count_files[key].close()
 
-    return True
+    return (rotstate_per_traj.items(), time_per_traj.items())
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -230,7 +236,7 @@ if __name__ == '__main__':
     print "Computing dunking populations"
     print rotamer_counter(data_f_dunk, data_f_states, traj_col=args.traj_col)
 
-    write_rotamer_vs_time(data_f_dunk, data_f_states, traj_col=args.traj_col,
+    print compute_rotamer_vs_time(data_f_dunk, data_f_states, traj_col=args.traj_col,
                           prefix="rotamer")
 
     print "Computing dunking counts per residue"

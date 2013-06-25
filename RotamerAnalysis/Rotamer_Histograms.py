@@ -28,9 +28,9 @@ from Rotamer_Preprocessor import *
 # This writes chi1 or chi2 population densities in 1D
 # (kind of a weaker version of write_rotamer_rotamer_histogram below)
 # Note that it's unnormalized, but that's easy to change.
-def write_rotamer_histogram(data_lines, dihedral_cols,
+def compute_rotamer_histogram(data_lines, dihedral_cols,
                              histmin=0, histmax=360, histbins=250,
-                             prefix="1dhisto_chi2"):
+                             prefix=None):
     dihedral_vals = []
     for line in data_lines:
         dihedral_vals.extend([line[col] for col in dihedral_cols])
@@ -38,18 +38,19 @@ def write_rotamer_histogram(data_lines, dihedral_cols,
     histo, edges = histogram(dihedral_vals, range=[histmin, histmax],
                                      bins=histbins, normed=False)
 
-    with open(prefix+"_dihedrals","w") as out:
-        for xval, yval in zip(edges,histo):
-            out.write(str(xval)+" "+str(yval)+"\n")
+    if prefix != None:
+        with open(prefix+"_dihedrals","w") as out:
+            for xval, yval in zip(edges,histo):
+                out.write(str(xval)+" "+str(yval)+"\n")
 
-    return True
+    return (histo, edges)
 
 # This writes Chi1 vs Chi2 distributions (or vice versa) in the form of a
 # 2D histogram.
-def write_rotamer_rotamer_histogram(data_lines,
+def compute_rotamer_rotamer_histogram(data_lines,
                                     dihedral_cols_x, dihedral_cols_y,
                                     histmin=0, histmax=360, histbins=250,
-                                    prefix="2dhisto", kBT=0.596):
+                                    prefix=None, kBT=0.596):
 
     dihedral_vals_x = []
     dihedral_vals_y = []
@@ -63,20 +64,20 @@ def write_rotamer_rotamer_histogram(data_lines,
                                                [histmin,histmax]],
                                         bins=[histbins,histbins], normed=True)
 
-    with open(prefix+"_dihedrals_pmf","w") as out:
-        for xbin in range(histbins):
-            for ybin in range(histbins):
-                if histo[xbin][ybin] > 0:
-                    out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
-                              str(histo[xbin][ybin])+" "+
-                              str(-kBT*log(histo[xbin][ybin]))+"\n")
-                else:
-                    out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
-                              str(histo[xbin][ybin])+" "+"11.0\n")
-            out.write("\n")
-    return True
+    if prefix != None:
+        with open(prefix+"_dihedrals_pmf","w") as out:
+            for xbin in range(histbins):
+                for ybin in range(histbins):
+                    if histo[xbin][ybin] > 0:
+                        out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
+                                  str(histo[xbin][ybin])+" "+
+                                  str(-kBT*log(histo[xbin][ybin]))+"\n")
+                    else:
+                        out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
+                                  str(histo[xbin][ybin])+" "+"11.0\n")
+                out.write("\n")
 
-
+    return (histo, xedges, yedges)
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -113,7 +114,7 @@ if __name__ == '__main__':
                                   traj_col=args.traj_col)
 
     print "Writing 1D histograms chi2 population"
-    write_rotamer_histogram(data_f_dunk, args.chi2_cols)
+    print compute_rotamer_histogram(data_f_dunk, args.chi2_cols)
 
     print "Writing 2D histograms chi2 vs chi1 population"
-    write_rotamer_rotamer_histogram(data_f_dunk, args.chi1_cols, args.chi2_cols)
+    print compute_rotamer_rotamer_histogram(data_f_dunk, args.chi1_cols, args.chi2_cols)
