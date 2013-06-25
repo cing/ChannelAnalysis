@@ -142,12 +142,16 @@ def count_totals_to_percents(count_totals, num_ions_map=[]):
 
 # Similar to the function above, but this script outputs
 # number of ions as a function of time to output files.
-def write_occ_vs_time(data_lines, num_cols=13,
+def compute_occ_vs_time(data_lines, num_cols=13,
                       traj_col=11, pad_col=4, sf_col=[], prefix=None):
 
     # This a dictionary of file streams that will be used for output
     # when prefix is assigned.
     count_files={}
+
+    # This is a dictionary of dictionaries where the key is a trajectory
+    # number and the list is the computed occupancy count
+    occ_per_traj_vs_time=defaultdict(list)
 
     for line in data_lines:
         traj_id = line[traj_col]
@@ -170,15 +174,15 @@ def write_occ_vs_time(data_lines, num_cols=13,
                                            str(traj_id)+" "+
                                            str(temp_ion_count)+
                                            "\n")
-            else:
-                print line[0], traj_id, temp_ion_count
+
+            occ_per_traj_vs_time[traj_id].append(temp_ion_count)
 
     # Close filestreams.
     if prefix != None:
         for key in count_files.keys():
             count_files[key].close()
 
-    return True
+    return occ_per_traj_vs_time.items()
 
 
 if __name__ == '__main__':
@@ -232,7 +236,7 @@ if __name__ == '__main__':
     print occ_counter(data_f, num_cols=args.num_cols,
                       traj_col=args.traj_col, sf_col=[], prefix="chanocc")
 
-    write_occ_vs_time(data_f, num_cols=args.num_cols,
+    print compute_occ_vs_time(data_f, num_cols=args.num_cols,
                       prefix="chanocc")
 
     # Same thing but now we pass the SF column list.
@@ -241,5 +245,5 @@ if __name__ == '__main__':
                       traj_col=args.traj_col, sf_col=args.sf_col,
                       prefix="sfocc")
 
-    write_occ_vs_time(data_f, num_cols=args.num_cols,
-                      sf_col=args.sf_col, prefix="sfocc")
+    print compute_occ_vs_time(data_f, num_cols=args.num_cols,
+                          sf_col=args.sf_col, prefix="sfocc")
