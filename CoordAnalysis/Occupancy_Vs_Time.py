@@ -83,62 +83,42 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
 
 # This is a helper function that takes the datatype generated in
 # *_counter functions (trajnum dict -> occupancy_id -> integer counts)
-# and converts this to populations in a list. Num ions map is
-# useful the occupancy_id's represent distinct numbers of ions
-# in the selectivity filter.
-def count_totals_to_percents(count_totals, num_ions_map=[]):
+# and converts this to populations in a list.
+def count_totals_to_percents(count_totals):
 
-    # Very ugly line that simply finds the maximum key for ion counts above
-    max_ions = max([traj for count_dict in count_totals.values()
-                    for traj in count_dict])
-
-    if not num_ions_map:
-        num_ions_map = range(max_ions+1)
-    assert len(num_ions_map) == max_ions+1, "Insufficient number of elements"
-
-    # This list has elements equal to the number of timesteps
-    # where each sublist contains max_ions rows and percentages
-    # under each column for that occupancy.
-    traj_total_percent = []
-
-    # Yet another average, here we want to know the mean and stdev occupancy
-    # of 1-ion, 2-ion, across all trajectories. They key is occupancy number
-    # and the value is a list of occupancies in percent.
-    traj_occ_averages = defaultdict(list)
-
+    # Here's the return datatype that stores the percentage of occupancy
+    # in a given channel/sf state which can be paired with the indices
+    ion_count_percents = defaultdict(list)
+    ion_count_indices = defaultdict(list)
     for traj_id, count_dict in count_totals.iteritems():
         traj_total_lines = float(sum(count_dict.values()))
+        for ion_state, ion_count in count_dict.iteritems():
+            ion_count_percents[traj_id].append(ion_count/traj_total_lines)
+            ion_count_indices[traj_id].append(ion_state)
 
-        temp_line = []
-        temp_line.append(traj_id)
-        for traj_index in range(max_ions+1):
-            temp_percent = count_dict[traj_index]/traj_total_lines
-            temp_line.append(temp_percent)
-            traj_occ_averages[traj_index].append(temp_percent)
+    # Append a little statistics, sorry if this is confusing...
+    all_weighted_avgs=[]
+    weighted_avgs_by_occid=defaultdict(list)
+    for traj_id, percents in ion_count_percents.iteritems():
+        temp_weighted_avg = 0
+        for occ_id, percent in enumerate(percents):
+            x = ion_count_indices[traj_id][occ_id]*percent
+            temp_weighted_avg += x
+            weighted_avgs_by_occid[occ_id].append(x)
+        all_weighted_avgs.append(temp_weighted_avg)
 
-        # Finally we append the last column which is the ion occupancy
-        # average for each trajectory
-        temp_average=0.
-        for occupancy,ion_count in zip(temp_line[1:],num_ions_map):
-            temp_average += occupancy*ion_count
+    for occ_id, weight_avg in weighted_avgs_by_occid.iteritems():
+        ion_count_percents['MEAN'].append(mean(weight_avg))
+        ion_count_indices['MEAN'].append(occ_id)
+        ion_count_percents['STDERR'].append(sem(weight_avg))
+        ion_count_indices['STDERR'].append(occ_id)
 
-        traj_total_percent.append(temp_line+[temp_average])
+    ion_count_percents['MEAN'].append(mean(all_weighted_avgs))
+    ion_count_indices['MEAN'].append('ALL')
+    ion_count_percents['STDERR'].append(sem(all_weighted_avgs))
+    ion_count_indices['STDERR'].append('ALL')
 
-        # We also store the weighted average in the same dictionary
-        # Note that max_ions+1 index doesn't exist in the loop
-        # above, we're using it to store this new value.
-        traj_occ_averages[max_ions+1].append(temp_average)
-
-    mean_occupancy =  [mean(traj_occ_averages[traj_index]) \
-                       for traj_index in range(max_ions+2)]
-
-    stderr_occupancy = [sem(traj_occ_averages[traj_index]) \
-                        for traj_index in range(max_ions+2)]
-
-    traj_total_percent.append(["MEAN"]+mean_occupancy)
-    traj_total_percent.append(["STDERR"]+stderr_occupancy)
-
-    return traj_total_percent
+    return (dict(ion_count_percents), dict(ion_count_indices))
 
 # Similar to the function above, but this script outputs
 # number of ions as a function of time to output files.
@@ -176,15 +156,15 @@ def compute_occ_vs_time(data_lines, num_cols=13,
                                            str(temp_ion_count)+
                                            "\n")
 
-            occ_per_traj[traj_id].append(temp_ion_count)
-            time_per_traj[traj_id].append(float(ion[0]))
+        occ_per_traj[traj_id].append(temp_ion_count)
+        time_per_traj[traj_id].append(float(ion[0]))
 
     # Close filestreams.
     if prefix != None:
         for key in count_files.keys():
             count_files[key].close()
 
-    return (occ_per_traj.items(), time_per_traj.items())
+    return (dict(occ_per_traj), dict(time_per_traj))
 
 
 if __name__ == '__main__':
