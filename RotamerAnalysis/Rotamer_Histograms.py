@@ -114,7 +114,12 @@ if __name__ == '__main__':
                                   traj_col=args.traj_col)
 
     print "Writing 1D histograms chi2 population"
-    print compute_rotamer_histogram(data_f_dunk, args.chi2_cols)
+    chi1s = compute_rotamer_histogram(data_f_dunk, args.chi1_cols,
+                                  prefix=args.outfile+"_chi1_")
+    chi2s = compute_rotamer_histogram(data_f_dunk, args.chi2_cols,
+                                  prefix=args.outfile+"_chi2_")
 
     print "Writing 2D histograms chi2 vs chi1 population"
-    print compute_rotamer_rotamer_histogram(data_f_dunk, args.chi1_cols, args.chi2_cols)
+    chi1_chi2s = compute_rotamer_rotamer_histogram(data_f_dunk,
+                                            args.chi1_cols, args.chi2_cols,
+                                            prefix=args.outfile+"_chi1_chi2_")
