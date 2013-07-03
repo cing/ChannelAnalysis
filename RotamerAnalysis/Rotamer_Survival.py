@@ -151,7 +151,7 @@ def compute_rotamer_state_survival(data_lines, data_states, survival_cut=600,
         fit_statistics.append((list(popt),list(np.sqrt(pcov.diagonal())),
                            fit_correlation))
 
-    return (survival_per_state.items(), time_per_state.items(), fit_statistics)
+    return (dict(survival_per_state), dict(time_per_state), fit_statistics)
 
 if __name__ == '__main__':
     parser = ArgumentParser(
