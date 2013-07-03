@@ -50,7 +50,7 @@ def window(seq, size=2, fill=0, fill_left=False, fill_right=False):
 # The meat of the file processing, nothing fancy though, just shifting
 # negative degrees to positive in the range of 0-360. Chi2 columns
 # is actually optional if your sidechain doesn't have it just omit.
-def process_rotamers(filenames, chi1_cols, chi2_cols=[],
+def process_rotamers(filenames, chi1_cols=[], chi2_cols=[],
                     remove_frames=0, traj_col=11, time_col=0):
 
     # The output list
@@ -65,36 +65,31 @@ def process_rotamers(filenames, chi1_cols, chi2_cols=[],
             data_raw_split = [line.strip().split() for line in data_raw]
 
             for line in data_raw_split:
-                time_val = int(float(line[time_col]))
-                traj_val = int(float(line[traj_col]))
+                # Exclude a header proceeded by an exclamation, another
+                # weird convention secretly adopted...
+                if line[0] != "!":
+                    time_val = int(float(line[time_col]))
+                    traj_val = int(float(line[traj_col]))
 
-                chi1_shifted = []
-                for col in chi1_cols:
-                    raw_chi1 = float(line[col])
-                    if -1*raw_chi1 <= 0:
-                        chi1_shifted.append(-1*raw_chi1 + 360.0)
+                    chi_shifted = []
+                    chi_sorted_cols = sorted(chi1_cols+chi2_cols)
+                    for col in chi_sorted_cols:
+                        raw_chi = -1.0*float(line[col])
+                        if raw_chi <= 0:
+                            chi_shifted.append(raw_chi + 360.0)
+                        else:
+                            chi_shifted.append(raw_chi)
+
+                    # I had this weird convention where the traj_num
+                    # was at the end of the rows in the input file, but now
+                    # it's at the start. Enragingly so. Legacy support.
+                    if (all([traj_col > x_col for x_col in chi_sorted_cols])):
+                        data_floats.append([time_val]+
+                                           chi_shifted +
+                                           [traj_val])
                     else:
-                        chi1_shifted.append(-1*raw_chi1)
-
-                chi2_shifted = []
-                for col in chi2_cols:
-                    raw_chi2 = float(line[col])
-                    if -1*raw_chi2 <= 0:
-                        chi2_shifted.append(-1*raw_chi2 + 360.0)
-                    else:
-                        chi2_shifted.append(-1*raw_chi2)
-
-                # I had this weird convention where the traj_num
-                # was at the end of the rows in the input file, but now it's
-                # at the start. Enragingly so. Legacy support.
-                if (all([traj_col > chi2_col for chi2_col in chi2_cols]) and
-                   all([traj_col > chi1_col for chi1_col in chi1_cols])):
-                    data_floats.append([time_val]+
-                                       chi1_shifted + chi2_shifted +
-                                       [traj_val])
-                else:
-                    data_floats.append([time_val, traj_val]+
-                                       chi1_shifted + chi2_shifted)
+                        data_floats.append([time_val, traj_val]+
+                                           chi_shifted)
 
     return data_floats
 
