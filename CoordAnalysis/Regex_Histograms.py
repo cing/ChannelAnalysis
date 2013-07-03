@@ -88,7 +88,7 @@ def compute_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
         hist_per_regex[str(coord_col)+"_ALL"].append(histo)
         z_per_regex[str(coord_col)+"_ALL"].append(edges)
 
-    return (hist_per_regex.items(), z_per_regex.items())
+    return (dict(hist_per_regex), dict(z_per_regex))
 
 if __name__ == '__main__':
     parser = ArgumentParser(
