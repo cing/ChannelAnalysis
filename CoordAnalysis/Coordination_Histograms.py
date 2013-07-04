@@ -20,8 +20,168 @@
 ###############################################################################
 from argparse import ArgumentParser
 from collections import defaultdict
-from numpy import histogram
+from numpy import histogram, sqrt
 from Ion_Preprocessor import *
+
+# This returns the sort_column as a time series, useful
+# for making scatterplot time series of ionic positions.
+def compute_ion_timeseries(data_lines, sort_col, traj_col,
+                           pad_col=4, num_cols=13):
+
+    # These are dictionaries of dict where the key is the traj_number
+    # and the subdict is ion_number and te value is a LIST of ion positions,
+    # or associated time values in the case of the associated time_per_traj
+    ion_pos_per_traj = defaultdict(dict)
+    time_per_traj = defaultdict(dict)
+
+    for line in data_lines:
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                sort_val = ion[sort_col]
+                traj_id = ion[traj_col]
+                if ion_num not in ion_pos_per_traj[traj_id]:
+                    ion_pos_per_traj[traj_id][ion_num] = [sort_val]
+                    time_per_traj[traj_id][ion_num] = [line[0]]
+                else:
+                    ion_pos_per_traj[traj_id][ion_num].append(sort_val)
+                    time_per_traj[traj_id][ion_num].append(line[0])
+
+    return (dict(ion_pos_per_traj), dict(time_per_traj))
+
+# To accompany compute_ion_timeseries, this function computes ion
+# position histograms per ion without taking into consideration
+# the coordination or macrostate that ion is occupying.
+def compute_position_histograms(data_lines, sort_col, traj_col,
+                                pad_col=4, num_cols=13,
+                                histmin=-1.50, histmax=1.5,
+                                histbins=300, histcount_cut=200):
+
+    # Power datatypes son. The structure is: traj_id -> ion_num -> z_vals
+    ion_sortvals = defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_ion = defaultdict(list)
+    z_per_ion= defaultdict(list)
+
+    for line in data_lines:
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                sort_val = ion[sort_col]
+                traj_id = ion[traj_col]
+                ion_sortvals[traj_id][ion_num].append(sort_val)
+
+    for traj_id, ion_dict in ion_sortvals.iteritems():
+        for ion_num, ion_vals in ion_dict.iteritems():
+            if len(ion_vals) > histcount_cut:
+                histo, edges = histogram(ion_vals, range=[histmin, histmax],
+                                     bins=histbins, normed=True)
+                coord_hist_per_ion[traj_id].append(histo)
+                z_per_ion[traj_id].append(edges)
+
+    return (dict(coord_hist_per_ion), dict(z_per_ion))
+
+# Exactly as above, except we don't histogram each ion individually,
+# hence the confusing function name change of "histograms" to "histogram".
+def compute_position_histogram(data_lines, sort_col, traj_col,
+                                pad_col=4, num_cols=13,
+                                histmin=-1.50, histmax=1.5,
+                                histbins=300,):
+
+    # Power datatypes son. The structure is: traj_id -> ion_num -> z_vals
+    ion_sortvals = defaultdict(list)
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_ion = defaultdict(list)
+    z_per_ion= defaultdict(list)
+
+    for line in data_lines:
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                sort_val = ion[sort_col]
+                traj_id = ion[traj_col]
+                ion_sortvals[traj_id].append(sort_val)
+
+    for traj_id, ion_vals in ion_sortvals.iteritems():
+        histo, edges = histogram(ion_vals, range=[histmin, histmax],
+                                bins=histbins, normed=True)
+        coord_hist_per_ion[traj_id].extend(list(histo))
+        z_per_ion[traj_id].extend(list(edges))
+
+    return (dict(coord_hist_per_ion), dict(z_per_ion))
+
+# This function exists to compute the square root of the sum of two squared
+# values in each line. For practical purposes, this is useful for
+# make a time series of r (sqrt(x^2+y^2)) and returning it in the same
+# format as the normal compute_ion_timeseries
+def compute_ion_sqrt_timeseries(data_lines, square_cols, traj_col,
+                           pad_col=4, num_cols=13):
+
+    # These are dictionaries of dict where the key is the traj_number
+    # and the subdict is ion_number and te value is a LIST of ion positions,
+    # or associated time values in the case of the associated time_per_traj
+    ion_pos_per_traj = defaultdict(dict)
+    time_per_traj = defaultdict(dict)
+
+    for line in data_lines:
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                square_vals = [ion[sq_col]**2 for sq_col in square_cols]
+                root_val = sqrt(sum(square_vals))
+                traj_id = ion[traj_col]
+                if ion_num not in ion_pos_per_traj[traj_id]:
+                    ion_pos_per_traj[traj_id][ion_num] = [root_val]
+                    time_per_traj[traj_id][ion_num] = [line[0]]
+                else:
+                    ion_pos_per_traj[traj_id][ion_num].append(root_val)
+                    time_per_traj[traj_id][ion_num].append(line[0])
+
+    return (dict(ion_pos_per_traj), dict(time_per_traj))
+
+# To accompany compute_ion_sqrt_timeseries, this function computes ion
+# position histograms per ion without taking into consideration
+# the coordination or macrostate that ion is occupying.
+def compute_position_sqrt_histograms(data_lines, square_cols, traj_col,
+                                pad_col=4, num_cols=13,
+                                histmin=-0.50, histmax=0.5,
+                                histbins=300, histcount_cut=200):
+
+    # Power datatypes son. The structure is: traj_id -> ion_num -> z_vals
+    ion_sortvals = defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_ion = defaultdict(list)
+    z_per_ion= defaultdict(list)
+
+    for line in data_lines:
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                square_vals = [ion[sq_col]**2 for sq_col in square_cols]
+                root_val = sqrt(sum(square_vals))
+                traj_id = ion[traj_col]
+                ion_sortvals[traj_id][ion_num].append(root_val)
+
+    for traj_id, ion_dict in ion_sortvals.iteritems():
+        for ion_num, ion_vals in ion_dict.iteritems():
+            if len(ion_vals) > histcount_cut:
+                histo, edges = histogram(ion_vals, range=[histmin, histmax],
+                                     bins=histbins, normed=True)
+                coord_hist_per_ion[traj_id].append(histo)
+                z_per_ion[traj_id].append(edges)
+
+    return (dict(coord_hist_per_ion), dict(z_per_ion))
 
 # this function looks at all ions at a timestep and checks what
 # coordination they have, grouping them into a list for generating
@@ -35,9 +195,9 @@ def compute_coord_histograms(data_lines, coord_cols=[4,5,6,7,8,9,10],
     # This is an epic datatype with the 1st key as the coordination column
     # of interest, the 2nd key is the integer coordination of interest
     # and the value is a list of values where that integer was observed.
-    coord_sortvals=defaultdict(lambda: defaultdict(list))
+    coord_sortvals = defaultdict(lambda: defaultdict(list))
 
-    # These are dictionaries of dictionaries where the key is a coord_col
+    # These are dictionaries of lists where the key is a coord_col
     # and the list is a axial probability or associated z value.
     coord_hist_per_col = defaultdict(list)
     z_per_col = defaultdict(list)
@@ -89,7 +249,7 @@ def compute_group_coord_histograms(data_lines, sf_col=[5,6],
 
     # This is a datatype where the 1st key is the coordination group id
     # and the value is a list of values where that group id was observed.
-    coord_sortvals=defaultdict(list)
+    coord_sortvals = defaultdict(list)
 
     # These are dictionaries of dictionaries where the key is a coord_col
     # and the list is a axial probability or associated z value.
