@@ -318,39 +318,41 @@ def process_input(filenames, sort_col=3, num_cols=13,
         if add_time:
             data_raw_split = add_time_column(data_raw_split, num_cols=num_cols)
 
-        prev_time = None
+        # This solves the problem of the first line not having a traj_num
+        # by searching the input file, though it's a problem using a merged
+        # trajectory.
+        prev_traj = None
         for line in data_raw_split:
             if (len(line) > traj_col) and (len(line) > time_col):
-                prev_time = int(float(line[time_col]))
                 prev_traj = int(float(line[traj_col]))
+        assert prev_traj != None, \
+                 "Input file " + filename + " had no traj_id column"
 
-        # This is basically a check to see if this datafile has any
-        # ion coordination. If not, skip it!
-        if prev_time != None:
-            # Now loop over the data and convert everything to integer
-            # except the float_cols columns.
-            for line in data_raw_split:
-                temp_line = []
-                for colindex, colvalue in enumerate(line):
-                    if (float_cols.count(colindex) > 0 or
-                        float_cols.count(colindex % num_cols) > 0):
-                        temp_line.append(float(colvalue))
-                    else:
-                        temp_line.append(int(float(colvalue)))
-                # This "pads" zero ion columns with a fake ion.
-                if len(temp_line) > 1:
-                    data_floats.append(temp_line)
-                    prev_time = int(float(line[time_col]))
-                    prev_traj = int(float(line[traj_col]))
+        # Loop over the data and convert everything to integer
+        # except the float_cols columns.
+        for line_num, line in enumerate(data_raw_split):
+            temp_line = []
+            # This frame number will be used when the time column
+            # is not located.
+            frame_num = remove_frames+line_num+1
+            for colindex, colvalue in enumerate(line):
+                if (float_cols.count(colindex) > 0 or
+                    float_cols.count(colindex % num_cols) > 0):
+                    temp_line.append(float(colvalue))
                 else:
-                    # TODO: There's a bug here when prev_time is
-                    # detected above as being half-way through a
-                    # file.
-                    data_floats.append([prev_time + time_increment] +
-                                       [0.,0.,0.] +
-                                       ["-" for x in range(num_cols-7)] +
-                                       [0,prev_traj,0])
-                    prev_time += time_increment
+                    temp_line.append(int(float(colvalue)))
+            # This "pads" zero ion columns with a fake ion with
+            # a timestamp.
+            if len(temp_line) > 1:
+                data_floats.append(temp_line)
+            else:
+                # TODO: There's a bug here when prev_time is
+                # detected above as being half-way through a
+                # file.
+                data_floats.append([frame_num] +
+                                   [0.,0.,0.] +
+                                   ["-" for x in range(num_cols-7)] +
+                                   [0,prev_traj,0])
 
     # TODO: Write something to remove duplicate lines.
 
