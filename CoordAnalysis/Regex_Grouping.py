@@ -41,7 +41,7 @@ from Ion_Preprocessor import *
 # This function counts regex occupancy in each trajectory of the input
 # data for each of the passes regex strings. It will return the
 # regex populations for each trajectory and then the associated stats.
-def regex_counter(data_floats, data_regex, traj_col=11, num_ions_map=[]):
+def regex_counter(data_floats, data_regex, traj_col=11):
 
     # This is an epic datatype that I will use to quickly build a
     # dict of dicts where the 1st key is a trajectory number
@@ -58,69 +58,38 @@ def regex_counter(data_floats, data_regex, traj_col=11, num_ions_map=[]):
 
     # Return the list of list, the mean and standard error of mean
     # for each trajectory in the input.
-    return count_totals_to_percents(count_totals, num_ions_map)
+    return count_totals_to_percents(count_totals)
 
 # This is a helper function that takes the datatype generated in
-# *_counter functions (trajnum dict -> occupancy_id -> integer counts)
-# and converts this to populations in a list. Num ions map is
-# useful the occupancy_id's represent distinct numbers of ions
-# in the selectivity filter. In occ_counter num_ions_map is 0 1 2 3 4 etc.
-# though in regex grouping you may have 1 2 2 3 0 etc. which only results
-# in your average occupancy per trajectory numbers being altered in the
-# final output.
-def count_totals_to_percents(count_totals, num_ions_map=[]):
+# *_counter functions (trajnum dict -> regex_id -> integer counts)
+# and converts this to populations in a list without weighting like
+# the occupancy count function.
+def count_totals_to_percents(count_totals):
 
-    # Very ugly line that simply finds the maximum key for ion counts above
-    max_ions = max([traj for count_dict in count_totals.values()
-                    for traj in count_dict])
-
-    if not num_ions_map:
-        num_ions_map = range(max_ions+1)
-    assert len(num_ions_map) == max_ions+1, "Insufficient number of elements"
-
-    # This list has elements equal to the number of timesteps
-    # where each sublist contains max_ions rows and percentages
-    # under each column for that occupancy.
-    traj_total_percent = []
-
-    # Yet another average, here we want to know the mean and stdev occupancy
-    # of 1-ion, 2-ion, across all trajectories. They key is occupancy number
-    # and the value is a list of occupancies in percent.
-    traj_occ_averages = defaultdict(list)
-
+    # Here's the return datatype that stores the percentage of occupancy
+    # in a given channel/sf state which can be paired with the indices
+    ion_count_percents = defaultdict(list)
+    ion_count_indices = defaultdict(list)
     for traj_id, count_dict in count_totals.iteritems():
         traj_total_lines = float(sum(count_dict.values()))
+        for ion_state, ion_count in count_dict.iteritems():
+            ion_count_percents[traj_id].append(ion_count/traj_total_lines)
+            ion_count_indices[traj_id].append(ion_state)
 
-        temp_line = []
-        temp_line.append(traj_id)
-        for traj_index in range(max_ions+1):
-            temp_percent = count_dict[traj_index]/traj_total_lines
-            temp_line.append(temp_percent)
-            traj_occ_averages[traj_index].append(temp_percent)
+    # Append a little statistics, sorry if this is confusing...
+    avgs_by_regex=defaultdict(list)
+    for traj_id, percents in ion_count_percents.iteritems():
+        regex_ids = ion_count_indices[traj_id]
+        for regex_id, percent in zip(regex_ids, percents):
+            avgs_by_regex[regex_id].append(percent)
 
-        # Finally we append the last column which is the ion occupancy
-        # average for each trajectory
-        temp_average=0.
-        for occupancy,ion_count in zip(temp_line[1:],num_ions_map):
-            temp_average += occupancy*ion_count
+    for regex_id, avg in avgs_by_regex.iteritems():
+        ion_count_percents['MEAN'].append(mean(avg))
+        ion_count_indices['MEAN'].append(regex_id)
+        ion_count_percents['STDERR'].append(sem(avg))
+        ion_count_indices['STDERR'].append(regex_id)
 
-        traj_total_percent.append(temp_line+[temp_average])
-
-        # We also store the weighted average in the same dictionary
-        # Note that max_ions+1 index doesn't exist in the loop
-        # above, we're using it to store this new value.
-        traj_occ_averages[max_ions+1].append(temp_average)
-
-    mean_occupancy =  [mean(traj_occ_averages[traj_index]) \
-                       for traj_index in range(max_ions+2)]
-
-    stderr_occupancy = [sem(traj_occ_averages[traj_index]) \
-                        for traj_index in range(max_ions+2)]
-
-    traj_total_percent.append(["MEAN"]+mean_occupancy)
-    traj_total_percent.append(["STDERR"]+stderr_occupancy)
-
-    return traj_total_percent
+    return (dict(ion_count_percents), dict(ion_count_indices))
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -149,9 +118,6 @@ if __name__ == '__main__':
     parser.add_argument(
     '-sf', dest='sf_col', type=int, nargs="+", default=[5,6],
     help='the coordination integer columns that define the selectivity filter')
-    parser.add_argument(
-    '-n', dest='num_ions_map', type=int, nargs="+", default=[1,2,2,3,0],
-    help='list of integer ion counts in SF for each regex value + 1 for extra')
     parser.add_argument(
     '-t', dest='traj_col', type=int, default=11,
     help='a zero inclusive column number that contains the run number')
@@ -184,5 +150,4 @@ if __name__ == '__main__':
 
     print "Regex Macrostate Occupancy"
     print regex_counter(data_f_padded, data_f_regex,
-                        num_ions_map=args.num_ions_map,
                         traj_col=args.traj_col)

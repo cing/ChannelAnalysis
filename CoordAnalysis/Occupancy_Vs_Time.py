@@ -79,12 +79,12 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
 
     # Return the list of list, the mean and standard error of mean
     # for each trajectory in the input.
-    return count_totals_to_percents(count_totals)
+    return count_totals_to_percents_weighted(count_totals)
 
 # This is a helper function that takes the datatype generated in
 # *_counter functions (trajnum dict -> occupancy_id -> integer counts)
 # and converts this to populations in a list.
-def count_totals_to_percents(count_totals):
+def count_totals_to_percents_weighted(count_totals):
 
     # Here's the return datatype that stores the percentage of occupancy
     # in a given channel/sf state which can be paired with the indices
