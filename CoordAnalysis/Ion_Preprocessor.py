@@ -96,11 +96,12 @@ def regex_columns(data_floats, regex_strings, num_cols=13,
                 temp_label.extend("-"*len(sf_col))
             num_ions += 1
 
+        #print temp_label
         # Here's a fix for when coordination integer counts are too large
         # and it ruins the fixed number of digit state label paradigm that
         # is critical for regex matching.
         for digit_index, digit in enumerate(temp_label):
-            if digit != "-" and digit > max_coord:
+            if digit != "-" and digit != "+" and digit > max_coord:
                 temp_label[digit_index] = max_coord
 
         for filler in range(max_ions-num_ions):
