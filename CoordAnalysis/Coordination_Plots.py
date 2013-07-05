@@ -17,24 +17,24 @@ from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 # This plots a stacked timeseries of trajectory properties in the main column
 # and histograms of this data in a second column. Sorry for the god-awful
 # number of arguments...
-def plot_navab_figure1(channel_occ, channel_counts,
-                       dunking_ts, dunking_counts,
-                       ion_ts_1st, ion_histo_1st,
-                       ion_ts_2nd, ion_histo_2nd,
-                       ion_ts_both, ion_histo_both,
-                       ion_ts_e_1st, ion_histo_e_1st,
-                       ion_ts_l_1st, ion_histo_l_1st,
-                       ion_ts_e_2nd, ion_histo_e_2nd,
-                       ion_ts_l_2nd, ion_histo_l_2nd,
-                       ion_ts_e_both, ion_histo_e_both,
-                       ion_ts_l_both, ion_histo_l_both,
-                       ion_ts_r, ion_histo_r,
-                       time_conv=0.02,
-                       prefix=None,
-                       plot_title="Figure 1 - Stacked Timeseries",
-                       max_coord=4,
-                       max_length=500,
-                       data_skip=10):
+def plot_stacked_timeseries(channel_occ, channel_counts,
+                            dunking_ts, dunking_counts,
+                            ion_ts_1st, ion_histo_1st,
+                            ion_ts_2nd, ion_histo_2nd,
+                            ion_ts_both, ion_histo_both,
+                            ion_ts_e_1st, ion_histo_e_1st,
+                            ion_ts_l_1st, ion_histo_l_1st,
+                            ion_ts_e_2nd, ion_histo_e_2nd,
+                            ion_ts_l_2nd, ion_histo_l_2nd,
+                            ion_ts_e_both, ion_histo_e_both,
+                            ion_ts_l_both, ion_histo_l_both,
+                            ion_ts_r, ion_histo_r,
+                            time_conv=0.02,
+                            prefix=None,
+                            plot_title="Stacked Timeseries",
+                            max_coord=4,
+                            max_length=500,
+                            data_skip=10):
 
     # This iterates over all the trajectory id's that you computed data for.
     # ion_timeseries[0] is the time values array, but any index would suffice.
