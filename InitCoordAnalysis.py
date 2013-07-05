@@ -2,183 +2,412 @@
 
 ################################################################################
 #
-# Where it all begins. This script calls the entire data analysis pipeline.
+# Where it all begins. This script calls the entire data analysis pipeline
+# based on a configuration input file.
 #
 # By Chris Ing, 2013 for Python 2.7
 #
 ################################################################################
 from CoordAnalysis import *
-from argparse import ArgumentParser
+from RotamerAnalysis import *
+from CoordAnalysis import Coord_Plots
+from sys import argv
+from ConfigParser import ConfigParser
 
-def main(args):
-    pre_prefix="1st/"
-    print "Sorting the ion coordination data"
-    data_f = process_input(filenames=args.filenames,
-                                          num_cols=args.num_cols,
-                                          max_ions=args.max_ions,
-                                          remove_frames=args.remove_frames,
-                                          traj_col=args.traj_col,
-                                          sort_col=args.sort_col,
-                                          add_time=args.add_time)
+# A helper function to return values as dictionaries from the config file
+def ConfigMap(cfgfile, section):
+    dict1 = {}
+    options = cfgfile.options(section)
+    for option in options:
+        try:
+            dict1[option] = cfgfile.get(section, option)
+            if dict1[option] == -1:
+                DebugPrint("skip: %s" % option)
+        except:
+            print("exception on %s!" % option)
+            dict1[option] = None
+    return dict1
 
-    #write_columns(data_f, outfile=pre_prefix+"test")
+# A helper function to convert string expressions to boolean values.
+def str2bool(v):
+  return v.lower() in ("yes", "true", "t", "1")
 
-    # Ion occupancy in the channel (governed by the MDAnalysis selection radii)
-    print "Channel Occupancy"
-    print occ_counter(data_f, num_cols=args.num_cols,
-                      traj_col=args.traj_col, sf_col=[],
-                      prefix=pre_prefix+"chanocc")
+# Extracts configuration data from the passed file and uses it to execute
+# a number of calculations for plotting. In need of refactoring.
+def main(cfgfile):
 
-    write_occ_vs_time(data_f, num_cols=args.num_cols,
-                      traj_col=args.traj_col, prefix=pre_prefix+"chanocc")
+    # Extract all the properties needed for rotamer studies.
+    try:
+        r = ConfigMap(cfgfile, 'rotamer_config')
+        #print r
+        filenames_rot = ConfigMap(cfgfile, 'rotamer_input_files').values()
+        filenames_rot_pre = [r["input_file_prefix"] +
+                             name for name in filenames_rot]
 
-    # Same thing but now we pass the SF column list.
-    print "SF Occupancy using columns", args.sf_col
-    print occ_counter(data_f, num_cols=args.num_cols,
-                      traj_col=args.traj_col, sf_col=args.sf_col,
-                      prefix=pre_prefix+"sfocc")
+        # This needs to be formatted from the comma-delimited string
+        chi1_cols = [int(x1_val) for x1_val in r["x1_cols"].split(",")]
+        chi2_cols = [int(x2_val) for x2_val in r["x2_cols"].split(",")]
+        state_dividers = [int(div) for div in r["dividers"].split(",")]
 
-    write_occ_vs_time(data_f, num_cols=args.num_cols, traj_col=args.traj_col,
-                      sf_col=args.sf_col, prefix=pre_prefix+"sfocc")
+    except:
+        print "No rotamer data specified or no x1/x2 columns found"
+    else:
+        print "Performing rotamer data processing"
+        # This is now dunking calculations.
+        data_rotamers = process_rotamers(filenames=filenames_rot_pre,
+                                         chi1_cols=chi1_cols,
+                                         chi2_cols=chi2_cols,
+                                         remove_frames=int(r["remove_frames"]),
+                                         traj_col=int(r["traj_col"]))
 
-    print "Writing multiple 1D histograms for ion coordination integers"
-    write_coord_histograms(data_f, coord_cols=args.coord_cols,
-                          num_cols=args.num_cols,
-                          sort_col=args.sort_col, prefix=pre_prefix+"1dhisto")
+        # Same thing but now we pass the SF column list.
+        data_f_states = label_states(data_rotamers,
+                                     chi2_cols,
+                                     state_dividers)
 
-    print "Writing multiple 1D histograms for zero or non-zero coordination"
-    write_group_coord_histograms(data_f, sf_col=args.sf_col,
-                          num_cols=args.num_cols,
-                          sort_col=args.sort_col, prefix=pre_prefix+"1dhisto")
+        print "Computing dunking populations"
+        dunking_counts = rotamer_counter(data_rotamers,
+                                         data_f_states,
+                                         traj_col=int(r["traj_col"]))
 
-    print "Computing the state stream using regular expressions"
-    data_f_padded = process_input(filenames=args.filenames,
-                                          num_cols=args.num_cols,
-                                          max_ions=args.max_ions,
-                                          remove_frames=args.remove_frames,
-                                          traj_col=args.traj_col,
-                                          sort_col=args.sort_col,
-                                          add_time=args.add_time,
-                                          padded=True)
+        dunking_ts = compute_rotamer_vs_time(data_rotamers,
+                                          data_f_states,
+                                          traj_col=int(r["traj_col"]),
+                                          prefix=r["out_prefix_rot"]+"rotamer")
 
-    data_f_regex = regex_columns(data_f_padded, regex_strings=args.regex,
-                                num_cols=args.num_cols,
-                                sort_col=args.sort_col,
-                                sort_cut=args.sort_cut,
-                                sf_col=args.sf_col,
-                                max_ions=args.max_ions)
+    # Extract all properties needed for 1st shell coordination studies.
+    try:
+        g = ConfigMap(cfgfile, 'coord_config')
+        #print g
+        filenames_1st = ConfigMap(cfgfile, 'coord_1st_input_files').values()
+        filenames_1st_pre = [g["input_file_prefix"] +
+                             name for name in filenames_1st]
 
-    print "Regex Macrostate Occupancy"
-    print regex_counter(data_f_padded, data_f_regex,
-                        num_ions_map=args.num_ions_map,
-                        traj_col=args.traj_col)
+        regexs = ConfigMap(cfgfile, 'coord_state_label_regexs').values()
 
-    print "Writing 1D histograms for regex coordination labels"
-    write_regex_histograms(data_f_padded, data_f_regex,
-                           traj_col=args.traj_col,
-                           num_cols=args.num_cols,
-                           max_ions=args.max_ions,
-                           sort_col=args.sort_col,
-                           prefix=pre_prefix+"1dhisto")
+        # This needs to be formatted from the comma-delimited string
+        coord_cols = [int(col) for col in g["coordination_cols"].split(",")]
+        sf_cols = [int(col) for col in g["selectivityf_cols"].split(",")]
 
-    print "State Transition Counting"
-    data_state_trans = state_transitions(data_f_padded, data_f_regex,
-                            time_col=args.time_col,
-                            time_increment=args.time_increment,
-                            traj_col=args.traj_col)
+    except:
+        print "No 1st shell data specified or no coordination columns found"
+    else:
+        print "Sorting the ion coordination data for 1st shell"
+        data_1st = process_input(filenames=filenames_1st_pre,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 max_ions=int(g["max_ions"]),
+                                 remove_frames=int(g["remove_frames"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sort_col=int(g["sort_col"]),
+                                 add_time=str2bool(g["add_time"]))
 
-    print "Computing Regex State Occupancies for macrostate graph"
-    data_f_occupancy = regex_counter(data_f_padded, data_f_regex,
-                        num_ions_map=args.num_ions_map,
-                        traj_col=args.traj_col)
-    # We want to extract only the mean occupancies in percent (2nd last entry)
-    data_f_mean_pop = data_f_occupancy[-2][1:]
+        print "Channel Occupancy and Figure 1 Calculations"
+        counts_1st = occ_counter(data_1st,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sf_col=[],
+                                 prefix=g["out_prefix_1st"]+"chanocc")
 
-    print "State Transition Graph Building and Writing"
-    #print data_state_trans
-    state_draw_map = [(0.0, 0),(1.0, 0),(2.0, 0),(3.0, 0),
-                          (0.5,-1),(1.5,-1),(2.5,-1),
-                               (1.0,-2),(2.0,-2),(3.0,-2),
-                                   (1.5,-3),(2.5,-3),
-                                        (2.0,-4)]
+        occ_1st = compute_occ_vs_time(data_1st,
+                                      num_cols=int(g["num_cols_per_ion"]),
+                                      traj_col=int(g["traj_col"]),
+                                      prefix=g["out_prefix_1st"]+"chanocc")
 
-    data_state_trans_graph = build_macrostate_graph(data_state_trans,
-                                                    state_draw_map,
-                                                    pop_map=data_f_mean_pop)
+        ion_ts_1st = compute_ion_timeseries(data_1st,
+                                           int(g["sort_col"]),
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
 
-    print "Macrostate Graph Writing"
-    write_macrostate_graph(data_state_trans_graph,
-                            outfile=pre_prefix+"graph_regex_macro.pdf")
+        ion_histo_1st = compute_position_histograms(data_1st,
+                                                    int(g["sort_col"]),
+                                                    int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
 
-    print "Microstate Graph Writing"
-    write_microstate_graph(data_f_padded, data_f_regex,
-                           time_col=args.time_col,
-                           time_increment=args.time_increment,
-                           traj_col=args.traj_col,
-                           outfile=pre_prefix+"graph_regex_micro.gexf")
+        ion_ts_e_1st = compute_ion_timeseries(data_1st,
+                                          int(g["sort_col"])+2,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
 
-    print "State Transition w/ Intermediate Counting"
-    print state_intermediate_transitions(data_f_padded, data_f_regex,
-                                         time_col=args.time_col,
-                                         time_increment=args.time_increment,
-                                         traj_col=args.traj_col)
+        ion_histo_e_1st = compute_position_histogram(data_1st,
+                                           int(g["sort_col"])+2,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+        ion_ts_l_1st = compute_ion_timeseries(data_1st,
+                                          int(g["sort_col"])+4,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_l_1st = compute_position_histogram(data_1st,
+                                           int(g["sort_col"])+4,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+        counts_sf_1st = occ_counter(data_1st,
+                                    num_cols=int(g["num_cols_per_ion"]),
+                                    traj_col=int(g["traj_col"]),
+                                    sf_col=sf_cols,
+                                    prefix=g["out_prefix_1st"]+"sfocc")
+
+        occ_sf_1st = compute_occ_vs_time(data_1st,
+                                         num_cols=int(g["num_cols_per_ion"]),
+                                         traj_col=int(g["traj_col"]),
+                                         sf_col=sf_cols,
+                                         prefix=g["out_prefix_1st"]+"sfocc")
+
+        print "Writing multiple 1D histograms for ion coordination integers"
+        coord_histo = compute_coord_histograms(data_1st,
+                                          coord_cols=coord_cols,
+                                          num_cols=int(g["num_cols_per_ion"]),
+                                          sort_col=int(g["sort_col"]),
+                                          prefix=g["out_prefix_1st"]+"1dhisto")
+
+        print "Writing multiple 1D histograms for zero or non-zero coord"
+        group_histo = compute_group_coord_histograms(data_1st,
+                                          sf_col=sf_cols,
+                                          num_cols=int(g["num_cols_per_ion"]),
+                                          sort_col=int(g["sort_col"]),
+                                          prefix=g["out_prefix_1st"]+"1dhisto")
+
+        print "Padding the ion coordination data for 1st shell"
+        data_1st = process_input(filenames=filenames_1st_pre,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 max_ions=int(g["max_ions"]),
+                                 remove_frames=int(g["remove_frames"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sort_col=int(g["sort_col"]),
+                                 add_time=str2bool(g["add_time"]),
+                                 padded=True)
+
+        print "Classifying sf columns as states with regular expressions"
+        data_regex_1st = regex_columns(data_1st,
+                                regex_strings=regexs,
+                                num_cols=int(g["num_cols_per_ion"]),
+                                sort_col=int(g["sort_col"]),
+                                sort_cut=int(g["sort_cut"]),
+                                sf_col=sf_cols,
+                                max_ions=int(g["max_ions"]))
+
+        print "Regex Macrostate Occupancy"
+        counts_regex = regex_counter(data_1st, data_regex_1st,
+                                     traj_col=int(g["traj_col"]))
+
+        print "Writing 1D histograms for regex coordination labels"
+        histo_regex = compute_regex_histograms(data_1st, data_regex_1st,
+                                          traj_col=int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]),
+                                          max_ions=int(g["max_ions"]),
+                                          sort_col=int(g["sort_col"]),
+                                          prefix=g["out_prefix_1st"]+"1dhisto")
+
+        print "State Transition Counting"
+        data_state_trans = state_transitions(data_1st, data_regex_1st,
+                                             traj_col=int(g["traj_col"]))
+        print data_state_trans
+
+        # Extract only the mean occupancies in percent (2nd last entry)
+        data_f_mean_pop = counts_regex[0]["MEAN"]
+        print data_f_mean_pop
+
+        print "State Transition Graph Building and Writing"
+        #print data_state_trans
+        '''
+        state_draw_map = [(0.0, 0),(1.0, 0),(2.0, 0),(3.0, 0),
+                              (0.5,-1),(1.5,-1),(2.5,-1),
+                                   (1.0,-2),(2.0,-2),(3.0,-2),
+                                       (1.5,-3),(2.5,-3),
+                                            (2.0,-4)]
+        '''
+        state_draw_map = [(0.0, 0),(1.0, 0),(0.5, -1)]
+
+        data_state_trans_graph = build_macrostate_graph(data_state_trans,
+                                                       state_draw_map,
+                                                       pop_map=data_f_mean_pop)
+
+        print "Macrostate Graph Writing"
+        write_macrostate_graph(data_state_trans_graph,
+                           outfile=g["out_prefix_1st"]+"graph_regex_macro.pdf")
+
+        print "Microstate Graph Writing"
+        write_microstate_graph(data_1st, data_regex_1st,
+                          traj_col=int(g["traj_col"]),
+                          outfile=g["out_prefix_1st"]+"graph_regex_micro.gexf")
+
+        print "State Transition w/ Intermediate Counting"
+        print state_intermediate_transitions(data_1st, data_regex_1st,
+                                             traj_col=int(g["traj_col"]))
+
+
+    # Extract all properties needed for 2nd shell coordination studies.
+    try:
+        g = ConfigMap(cfgfile, 'coord_config')
+        #print g
+        filenames_2nd = ConfigMap(cfgfile, 'coord_2nd_input_files').values()
+        filenames_2nd_pre = [g["input_file_prefix"] +
+                             name for name in filenames_2nd]
+    except:
+        print "No 2nd shell data specified"
+    else:
+        print "Sorting the ion coordination data for 2nd shell"
+        data_2nd = process_input(filenames=filenames_2nd_pre,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 max_ions=int(g["max_ions"]),
+                                 remove_frames=int(g["remove_frames"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sort_col=int(g["sort_col"]),
+                                 add_time=str2bool(g["add_time"]))
+
+        print "Channel Occupancy and Figure 1 Calculations"
+        counts_2nd = occ_counter(data_2nd,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sf_col=[],
+                                 prefix=g["out_prefix_2nd"]+"chanocc")
+
+        occ_2nd = compute_occ_vs_time(data_2nd,
+                                      num_cols=int(g["num_cols_per_ion"]),
+                                      traj_col=int(g["traj_col"]),
+                                      prefix=g["out_prefix_2nd"]+"chanocc")
+
+        ion_ts_2nd = compute_ion_timeseries(data_2nd,
+                                           int(g["sort_col"]),
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_2nd = compute_position_histograms(data_2nd,
+                                                    int(g["sort_col"]),
+                                                    int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        ion_ts_e_2nd = compute_ion_timeseries(data_2nd,
+                                          int(g["sort_col"])+2,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_e_2nd = compute_position_histogram(data_2nd,
+                                           int(g["sort_col"])+2,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+        ion_ts_l_2nd = compute_ion_timeseries(data_2nd,
+                                          int(g["sort_col"])+4,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_l_2nd = compute_position_histogram(data_2nd,
+                                           int(g["sort_col"])+4,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+    # Extract all properties needed for both shell coordination studies.
+    try:
+        g = ConfigMap(cfgfile, 'coord_config')
+        #print g
+        filenames_both = ConfigMap(cfgfile, 'coord_both_input_files').values()
+        filenames_both_pre = [g["input_file_prefix"] +
+                             name for name in filenames_both]
+    except:
+        print "No both shell data specified"
+    else:
+        print "Sorting the ion coordination data for both shells"
+        data_both = process_input(filenames=filenames_both_pre,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 max_ions=int(g["max_ions"]),
+                                 remove_frames=int(g["remove_frames"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sort_col=int(g["sort_col"]),
+                                 add_time=str2bool(g["add_time"]))
+
+        print "Channel Occupancy and Figure 1 Calculations"
+        counts_both = occ_counter(data_both,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sf_col=[],
+                                 prefix=g["out_prefix_both"]+"chanocc")
+
+        occ_both = compute_occ_vs_time(data_both,
+                                      num_cols=int(g["num_cols_per_ion"]),
+                                      traj_col=int(g["traj_col"]),
+                                      prefix=g["out_prefix_both"]+"chanocc")
+
+        ion_ts_both = compute_ion_timeseries(data_both,
+                                           int(g["sort_col"]),
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_both = compute_position_histograms(data_both,
+                                                    int(g["sort_col"]),
+                                                    int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        ion_ts_e_both = compute_ion_timeseries(data_both,
+                                          int(g["sort_col"])+2,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_e_both = compute_position_histogram(data_both,
+                                           int(g["sort_col"])+2,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+        ion_ts_l_both = compute_ion_timeseries(data_both,
+                                          int(g["sort_col"])+4,
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_l_both = compute_position_histogram(data_both,
+                                           int(g["sort_col"])+4,
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]),
+                                           histmin=0, histmax=7,
+                                           histbins=7)
+
+        ion_ts_r = compute_ion_sqrt_timeseries(data_both,
+                                          [int(g["sort_col"])-2,
+                                           int(g["sort_col"])-1],
+                                          int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]))
+
+        ion_histo_r = compute_position_sqrt_histograms(data_both,
+                                           [int(g["sort_col"])-2,
+                                           int(g["sort_col"])-1],
+                                           int(g["traj_col"]),
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        '''
+        print "Preparing plots for Stacked Histogram"
+        p = ConfigMap(cfgfile, 'plot_config')
+        plot_stacked_timeseries(occ_1st, counts_1st,
+                                dunking_ts, dunking_counts,
+                                ion_ts_1st, ion_histo_1st,
+                                ion_ts_2nd, ion_histo_2nd,
+                                ion_ts_both, ion_histo_both,
+                                ion_ts_e_1st, ion_histo_e_1st,
+                                ion_ts_l_1st, ion_histo_l_1st,
+                                ion_ts_e_2nd, ion_histo_e_2nd,
+                                ion_ts_l_2nd, ion_histo_l_2nd,
+                                ion_ts_e_both, ion_histo_e_both,
+                                ion_ts_l_both, ion_histo_l_both,
+                                ion_ts_r, ion_histo_r,
+                                time_conv=float(p["time_conv"]),
+                                prefix=p["out_prefix_plot"]+"figure1",
+                                plot_title=p["fig1_title"],
+                                max_coord=int(p["max_coord"]),
+                                max_length=int(p["max_length"]))
+        '''
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(
-    description='This script parses input columnular ASCII data\
-    and makes it nice and pretty for subsequent analysis.')
-
-    # These arguments are required for input processing and are required
-    parser.add_argument(
-    '-f', dest='filenames', type=str, nargs="+", required=True,
-    help='a filename of coordination data from MDAnalysis trajectory data')
-    parser.add_argument(
-    '-m', dest='max_ions', type=int, required=True,
-    help='the maximum number of ions in the channel to consider')
-    parser.add_argument(
-    '-c', dest='num_cols', type=int, default=13,
-    help='the number of columns per ion in the input')
-    parser.add_argument(
-    '-remove', dest='remove_frames', type=int, default=0,
-    help='this is a number of frames to remove from the start of the data')
-    parser.add_argument(
-    '-s', dest='sort_col', type=int, default=3,
-    help='a zero inclusive column number to sort your row on, typically x,y,z')
-    parser.add_argument(
-    '-t', dest='traj_col', type=int, default=11,
-    help='a zero inclusive column number that contains the run number')
-    parser.add_argument(
-    '--addtime', dest='add_time', action="store_true", default=False,
-    help='an optional argument to add time columns to each ion grouping')
-
-    # The following is used for 1D coordination histograms
-    parser.add_argument(
-    '-coord', dest='coord_cols', type=int, nargs="+", default=[4,5,6,7,8,9,10],
-    help='all the columns with coordination counts')
-
-    # The following arguments are used for regex state stream processing
-    parser.add_argument(
-    '-i', dest='regex', type=str, nargs="+",
-    help='a list of regex values in quotes for state stream processing')
-    parser.add_argument(
-    '-sc', dest='sort_cut', type=float, default=0.0,
-    help='a value on the sort_col range to classify zero coordinated data')
-    parser.add_argument(
-    '-sf', dest='sf_col', type=int, nargs="+", default=[5,6],
-    help='the coordination integer columns that define the selectivity filter')
-    parser.add_argument(
-    '-n', dest='num_ions_map', type=int, nargs="+", default=[1,2,2,3,0],
-    help='list of integer ion counts in SF for each regex value + 1 for extra')
-
-    # The following arguments are used for regex state transition processing
-    parser.add_argument(
-    '-timecol', dest='time_col', type=int, default=0,
-    help='a zero inclusive column number with the frame/timestep number')
-    parser.add_argument(
-    '-dt', dest='time_increment', type=int, default=1,
-    help='the difference in the time column between steps')
-
-    args = parser.parse_args()
-
-    main(args)
+    cfgfile = ConfigParser()
+    cfgfile.read(argv[1])
+    main(cfgfile)
