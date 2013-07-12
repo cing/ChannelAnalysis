@@ -20,7 +20,7 @@
 ###############################################################################
 from argparse import ArgumentParser
 from collections import defaultdict
-from numpy import histogram, sqrt
+from numpy import histogram, sqrt, linspace, zeros, digitize
 from Ion_Preprocessor import *
 
 # This returns the sort_column as a time series, useful
@@ -152,7 +152,7 @@ def compute_ion_sqrt_timeseries(data_lines, square_cols, traj_col,
 # the coordination or macrostate that ion is occupying.
 def compute_position_sqrt_histograms(data_lines, square_cols, traj_col,
                                 pad_col=4, num_cols=13,
-                                histmin=-0.50, histmax=0.5,
+                                histmin=0, histmax=1.0,
                                 histbins=300, histcount_cut=200):
 
     # Power datatypes son. The structure is: traj_id -> ion_num -> z_vals
@@ -287,6 +287,57 @@ def compute_group_coord_histograms(data_lines, sf_col=[5,6],
         z_per_col[str(group_id)].append(edges)
 
     return (coord_hist_per_col.items(), z_per_col.items())
+
+# Returns a histogram for each ion in each of the channel
+# ion occupancy states across the whole dataset.
+def compute_ionsplit_histograms(data_lines, sort_col,
+                                pad_col=4, num_cols=13,
+                                histmin=-1.50, histmax=1.5,
+                                histbins=300, histcount_cut=200,
+                                prefix=None):
+
+    # Power datatypes son. The structure is: ion_occ -> ion_num -> z_vals
+    ion_sortvals = defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_ion = defaultdict(list)
+    z_per_ion= defaultdict(list)
+
+    for line in data_lines:
+
+        temp_ion_count = 0
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                temp_ion_count += 1
+
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                sort_val = ion[sort_col]
+                ion_sortvals[temp_ion_count][ion_num].append(sort_val)
+
+    for occ_id, ion_dict in ion_sortvals.iteritems():
+        for ion_num, ion_vals in ion_dict.iteritems():
+            if len(ion_vals) > histcount_cut:
+                histo, edges = histogram(ion_vals, range=[histmin, histmax],
+                                     bins=histbins, normed=True)
+
+                if prefix != None:
+                    with open(prefix+"_ionsplit"+str(occ_id)
+                              + str(ion_num),"w") as out:
+
+                        for xval, yval in zip(edges,histo):
+                            out.write(str(xval)+" "+str(yval)+"\n")
+
+                coord_hist_per_ion[occ_id].append(histo)
+                z_per_ion[occ_id].append(edges)
+
+    return (dict(coord_hist_per_ion), dict(z_per_ion))
+
 
 if __name__ == '__main__':
     parser = ArgumentParser(
