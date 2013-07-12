@@ -79,7 +79,7 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
 
     # Return the list of list, the mean and standard error of mean
     # for each trajectory in the input.
-    return count_totals_to_percents_weighted(count_totals)
+    return count_totals_to_percents(count_totals)
 
 # This is a helper function that takes the datatype generated in
 # *_counter functions (trajnum dict -> occupancy_id -> integer counts)
@@ -117,6 +117,39 @@ def count_totals_to_percents_weighted(count_totals):
     ion_count_indices['MEAN'].append('ALL')
     ion_count_percents['STDERR'].append(sem(all_weighted_avgs))
     ion_count_indices['STDERR'].append('ALL')
+
+    return (dict(ion_count_percents), dict(ion_count_indices))
+
+# This is a helper function that takes the datatype generated in
+# *_counter functions (trajnum dict -> regex_id -> integer counts)
+# and converts this to populations in a list without weighting like
+# the occupancy count function.
+def count_totals_to_percents(count_totals):
+
+    # Here's the return datatype that stores the percentage of occupancy
+    # in a given channel/sf state which can be paired with the indices
+    ion_count_percents = defaultdict(list)
+    ion_count_indices = defaultdict(list)
+    for traj_id, count_dict in count_totals.iteritems():
+        traj_total_lines = float(sum(count_dict.values()))
+        for ion_state, ion_count in count_dict.iteritems():
+            ion_count_percents[traj_id].append(ion_count/traj_total_lines)
+            ion_count_indices[traj_id].append(ion_state)
+
+    # Append a little statistics, sorry if this is confusing...
+    avgs_by_regex=defaultdict(list)
+    for traj_id, percents in ion_count_percents.iteritems():
+        regex_ids = ion_count_indices[traj_id]
+        # TODO: Bug, This doesn't quite give the right mean/stderr
+        #       values when only 1 trajectory has a high ion occupancy...
+        for regex_id, percent in zip(regex_ids, percents):
+            avgs_by_regex[regex_id].append(percent)
+
+    for regex_id, avg in avgs_by_regex.iteritems():
+        ion_count_percents['MEAN'].append(mean(avg))
+        ion_count_indices['MEAN'].append(regex_id)
+        ion_count_percents['STDERR'].append(sem(avg))
+        ion_count_indices['STDERR'].append(regex_id)
 
     return (dict(ion_count_percents), dict(ion_count_indices))
 
