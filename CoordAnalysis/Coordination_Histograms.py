@@ -20,7 +20,9 @@
 ###############################################################################
 from argparse import ArgumentParser
 from collections import defaultdict
-from numpy import histogram, sqrt, linspace, zeros, digitize
+from numpy import histogram, histogram2d, sqrt, linspace, zeros, digitize, log
+from numpy import where, isinf
+from itertools import combinations
 from Ion_Preprocessor import *
 
 # This returns the sort_column as a time series, useful
@@ -114,6 +116,42 @@ def compute_position_histogram(data_lines, sort_col, traj_col,
                                 bins=histbins, normed=True)
         coord_hist_per_ion[traj_id].extend(list(histo))
         z_per_ion[traj_id].extend(list(edges))
+
+    return (dict(coord_hist_per_ion), dict(z_per_ion))
+
+# Yet another way of making a histogram, we don't look at the traj_col
+# at all, we simply add all the ionic data together and do 1 big boy.
+def compute_allion_histogram(data_lines, sort_col,
+                                pad_col=4, num_cols=13,
+                                histmin=-1.50, histmax=1.5,
+                                histbins=300, normed=True, prefix=None):
+
+    # Power datatypes son. The structure is: traj_id -> ion_num -> z_vals
+    ion_sortvals = []
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_ion = defaultdict(list)
+    z_per_ion= defaultdict(list)
+
+    for line in data_lines:
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                sort_val = ion[sort_col]
+                ion_sortvals.append(sort_val)
+
+    histo, edges = histogram(ion_sortvals, range=[histmin, histmax],
+                            bins=histbins, normed=normed)
+
+    if prefix != None:
+        with open(prefix+"_allion","w") as out:
+            for xval, yval in zip(edges,histo):
+                out.write(str(xval)+" "+str(yval)+"\n")
+
+    coord_hist_per_ion["ALL"].extend(list(histo))
+    z_per_ion["ALL"].extend(list(edges))
 
     return (dict(coord_hist_per_ion), dict(z_per_ion))
 
@@ -338,6 +376,85 @@ def compute_ionsplit_histograms(data_lines, sort_col,
 
     return (dict(coord_hist_per_ion), dict(z_per_ion))
 
+# Returns a histogram for each ion in each of the channel
+# ion occupancy states across the whole dataset.
+def compute_ionsplit_2dhistograms(data_lines, sort_col,
+                                  pad_col=4, num_cols=13,
+                                  occ_cutoff=3, kBT=0.596,
+                                  histmin=-1.50, histmax=1.5,
+                                  histbins=300,
+                                  prefix=None):
+
+    # Power datatypes son. The structure is: ion_occ -> ion_num -> z_vals
+    ion_sortvals = defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_2dhist_per_pair = defaultdict(list)
+    xedges_per_pair = defaultdict(list)
+    yedges_per_pair = defaultdict(list)
+
+    for line in data_lines:
+
+        temp_ion_count = 0
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                temp_ion_count += 1
+
+        # 2d histograms do not exist for 0 and 1 ion occupancy values.
+        if temp_ion_count > 1:
+
+            # Ion occupancy values larger than occ_cutoff are lumped together
+            temp_ion_count = min(temp_ion_count, occ_cutoff)
+
+            for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+                # In the case that the ion grouping has a hypen
+                # we know that's a padded column and must be excluded.
+                # Keep in mind that if we had large ion occupancy
+                # we won't be plotting the 2d histograms passed the occ_cutoff
+                # so it's pointless to generate that data, hence the
+                # occ_cutoff check below.
+                if ion[pad_col] != "-" and ion_num < occ_cutoff:
+                    sort_val = ion[sort_col]
+                    ion_sortvals[temp_ion_count][ion_num].append(sort_val)
+
+    for occ_id, ion_dict in ion_sortvals.iteritems():
+
+        for occ_pair in combinations(range(occ_id),2):
+            histo, xedges, yedges = histogram2d(ion_dict[occ_pair[0]],
+                                                ion_dict[occ_pair[1]],
+                                                range=[[histmin, histmax],
+                                                       [histmin, histmax]],
+                                                bins=[histbins,histbins],
+                                                normed=True)
+
+            # Since we're taking the log, remove all 0.0 values.
+            low_val_indices = histo <= 0.0
+            high_val_indices = histo > 0.0
+            histo[low_val_indices] = 5.0
+            histo[high_val_indices] = -kBT*log(histo[high_val_indices])
+
+            # Everything must be shifted such that 0 is the true minimum value.
+            min_val = min(histo[high_val_indices])
+            histo[high_val_indices] = histo[high_val_indices] + abs(min_val)
+
+            if prefix != None:
+                with open(prefix + "_ionsplit_occ" + str(occ_id),"w") as out:
+                    for xval, yval, zval in zip(xedges, yedges, histo):
+                        out.write(str(xval) + " " +
+                                  str(yval) + " " + str(zval) + "\n")
+
+            #import pdb
+            #pdb.set_trace()
+            coord_2dhist_per_pair[occ_id].append(histo)
+            xedges_per_pair[occ_id].append(xedges)
+            yedges_per_pair[occ_id].append(yedges)
+
+    return (dict(coord_2dhist_per_pair),
+            dict(xedges_per_pair),
+            dict(yedges_per_pair))
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -384,6 +501,7 @@ if __name__ == '__main__':
                                           sort_col=args.sort_col,
                                           add_time=args.add_time)
 
+    '''
     print "Writing multiple 1D histograms for ion coordination integers"
     print compute_coord_histograms(data_f, coord_cols=args.coord_cols,
                              num_cols=args.num_cols,
@@ -393,3 +511,11 @@ if __name__ == '__main__':
     print compute_group_coord_histograms(data_f, sf_col=args.sf_col,
                                    num_cols=args.num_cols,
                                    sort_col=args.sort_col, prefix=args.prefix)
+    '''
+
+    print "Writing average coordination per z bin arrays"
+    compute_avg_coord_histograms(data_f, coord_cols=args.coord_cols,
+                                     num_cols=args.num_cols,
+                                     sort_col=args.sort_col,
+                                     prefix=args.prefix)
+
