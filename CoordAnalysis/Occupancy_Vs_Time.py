@@ -37,6 +37,10 @@ from Ion_Preprocessor import *
 def occ_counter(data_lines, num_cols=13, traj_col=11,
                 pad_col=4, sf_col=[5,6], prefix=None):
 
+    # This is a big list of all occupancy states in the dataset
+    # that will be used to make a set to extract the unique indices.
+    all_occupancy_states = []
+
     # This is an epic datatype that I will use to quickly build a
     # dict of dicts where the 1st key is a trajectory number
     # and the second key is the ion count and the value is a
@@ -60,6 +64,8 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
                 else:
                     temp_ion_count += 1
 
+        all_occupancy_states.append(temp_ion_count)
+
         # Good old defaultdict, no need to initialize!
         count_totals[traj_id][temp_ion_count] += 1
 
@@ -72,6 +78,13 @@ def occ_counter(data_lines, num_cols=13, traj_col=11,
                 count_files[temp_ion_count].write(
                     " ".join([str(col) for col in line]))
                 count_files[temp_ion_count].write("\n")
+
+    # This fills zero in for all known occupancy states for all
+    # trajectories. This is useful because we do a mean
+    # across all trajectories later.
+    for traj_id in count_totals.keys():
+        for known_state in set(all_occupancy_states):
+            count_totals[traj_id][known_state] += 0
 
     if prefix != None:
         for key in count_files.keys():
