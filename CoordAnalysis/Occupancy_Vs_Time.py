@@ -153,8 +153,6 @@ def count_totals_to_percents(count_totals):
     avgs_by_regex=defaultdict(list)
     for traj_id, percents in ion_count_percents.iteritems():
         regex_ids = ion_count_indices[traj_id]
-        # TODO: Bug, This doesn't quite give the right mean/stderr
-        #       values when only 1 trajectory has a high ion occupancy...
         for regex_id, percent in zip(regex_ids, percents):
             avgs_by_regex[regex_id].append(percent)
 
