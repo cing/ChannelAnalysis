@@ -41,7 +41,7 @@ from Ion_Preprocessor import *
 # This function counts regex occupancy in each trajectory of the input
 # data for each of the passes regex strings. It will return the
 # regex populations for each trajectory and then the associated stats.
-def regex_counter(data_floats, data_regex, traj_col=11):
+def regex_counter(data_floats, data_regex, all_regex_states, traj_col=11):
 
     # This is an epic datatype that I will use to quickly build a
     # dict of dicts where the 1st key is a trajectory number
@@ -55,6 +55,13 @@ def regex_counter(data_floats, data_regex, traj_col=11):
     for line, regex_state in zip(data_floats,data_regex_ids):
         traj_id = line[traj_col]
         count_totals[traj_id][regex_state] += 1
+
+    # This fills zero in for all known occupancy states for all
+    # trajectories. This is useful because we do a mean
+    # across all trajectories later.
+    for traj_id in count_totals.keys():
+        for known_state in all_regex_states:
+            count_totals[traj_id][known_state] += 0
 
     # Return the list of list, the mean and standard error of mean
     # for each trajectory in the input.
