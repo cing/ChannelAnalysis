@@ -230,7 +230,8 @@ def state_intermediate_transitions(data_floats, data_regex,
 # array need to be placed inside a diamond using the grid_map. grid_map is a
 # list of strings that represent positions on a 2D lattice. Anything in
 # the 2D lattice without a corresponding grid_map entry will be deleted.
-def build_macrostate_graph(state_edges, grid_map, pop_map=None, delim="-"):
+def build_macrostate_graph(state_edges, grid_map, pop_map=None, delim="-",
+                           count_cut=10):
     try:
         import networkx as nx
     except ImportError:
@@ -257,18 +258,24 @@ def build_macrostate_graph(state_edges, grid_map, pop_map=None, delim="-"):
                             macro_graph.add_node(node,
                                                    pos=grid_map[int(node)])
 
-            if (int(nodes[0]) != skip_id) and (int(nodes[-1]) != skip_id):
-                macro_graph.add_edge(nodes[0],nodes[-1], weight=count)
+            if count > count_cut:
+                if (int(nodes[0]) != skip_id) and (int(nodes[-1]) != skip_id):
+                    macro_graph.add_edge(nodes[0],nodes[-1], weight=count)
 
         return macro_graph
 
-def write_macrostate_graph(macro_graph, outfile="graph_regex_macro.pdf"):
+def write_macrostate_graph(macro_graph, regexs_map=None,
+                           plot_title="Macrostate Graph",
+                           outfile="graph_regex_macro.pdf"):
     try:
         import networkx as nx
         import matplotlib.pyplot as plt
     except ImportError:
         print "This function requires networkx/matplotlib for graph plotting"
     else:
+        # Initialize a new plot
+        fig = plt.figure()
+
         pos=nx.get_node_attributes(macro_graph,'pos')
         elabels=nx.get_edge_attributes(macro_graph,'weight')
         nlabels=nx.get_node_attributes(macro_graph,'weight')
@@ -276,7 +283,11 @@ def write_macrostate_graph(macro_graph, outfile="graph_regex_macro.pdf"):
         # Here we're going to add the state populations to the node labels
         if len(nlabels) > 0:
             for label, pop in nlabels.iteritems():
-                nlabels[label] = label + "\n(" + nlabels[label] + ")"
+                if regexs_map != None:
+                    nlabels[label] = regexs_map[int(label)] + \
+                                     "\n(" + nlabels[label] + ")"
+                else:
+                    nlabels[label] = label + "\n(" + nlabels[label] + ")"
 
         # Since networkx graph drawing actually kinda stinks for DiGraph's
         # I have to make joint labels for forward and reverse edges.
@@ -302,6 +313,10 @@ def write_macrostate_graph(macro_graph, outfile="graph_regex_macro.pdf"):
                                      font_size=5,
                                      label_pos=0.40)
         plt.axis('off')
+        plt.subplots_adjust(hspace = 0.1, wspace = 0.02,
+                            left = 0.1, bottom = 0.08,
+                            right = 0.95, top = 0.75)
+        plt.suptitle(plot_title)
         plt.savefig(outfile)
 
 if __name__ == '__main__':
