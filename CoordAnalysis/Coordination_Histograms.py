@@ -21,7 +21,7 @@
 from argparse import ArgumentParser
 from collections import defaultdict
 from numpy import histogram, histogram2d, sqrt, linspace, zeros, digitize, log
-from numpy import where, isinf
+from numpy import where, isinf, array
 from itertools import combinations
 from Ion_Preprocessor import *
 
@@ -451,7 +451,8 @@ def compute_ionsplit_2dhistograms(data_lines, sort_col,
             histo[high_val_indices] = histo[high_val_indices] + abs(min_val)
 
             if prefix != None:
-                with open(prefix + "_ionsplit_occ" + str(occ_id),"w") as out:
+                with open(prefix + "_ionsplit_occ" + str(occ_pair[0]) +
+                          "-" + str(occ_pair[1]),"w") as out:
                     for xval, yval, zval in zip(xedges, yedges, histo):
                         out.write(str(xval) + " " +
                                   str(yval) + " " + str(zval) + "\n")
@@ -465,6 +466,89 @@ def compute_ionsplit_2dhistograms(data_lines, sort_col,
     return (dict(coord_2dhist_per_pair),
             dict(xedges_per_pair),
             dict(yedges_per_pair))
+
+# This is a projection of the 2d histograms above, such that we have a
+# distribution of distances between pairs of ions.
+def compute_iondist_histograms(data_lines, sort_col,
+                               pad_col=4, num_cols=13,
+                               occ_lower_cut=2, occ_higher_cut=4,
+                               ion_num_cutoff=3,
+                               kBT=0.596, max_eng=6.0,
+                               histmin=-1.5, histmax=0,
+                               histbins=300, pmf=False,
+                               prefix=None):
+
+    # Power datatypes son. The structure is: ion_occ -> ion_num -> z_vals
+    ion_sortvals = defaultdict(lambda: defaultdict(list))
+
+    # These are dictionaries of lists where the key is a coord_col
+    # and the list is a axial probability or associated z value.
+    coord_hist_per_pair = defaultdict(list)
+    edges_per_pair = defaultdict(list)
+
+    for line in data_lines:
+
+        temp_ion_count = 0
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                temp_ion_count += 1
+
+        # 2d histograms do not exist for 0 and 1 ion occupancy values,
+        # the exact lower value for occupancy is an argument above.
+        if temp_ion_count >= occ_lower_cut:
+
+            # Ion occupancy values larger than occ_cutoff are lumped together
+            temp_ion_count = min(temp_ion_count, occ_higher_cut)
+
+            for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+                # In the case that the ion grouping has a hypen
+                # we know that's a padded column and must be excluded.
+                # Keep in mind that if we had large ion occupancy
+                # we won't be plotting the 2d histograms passed the occ_cutoff
+                # so it's pointless to generate that data, hence the
+                # occ_cutoff check below.
+                if ion[pad_col] != "-" and ion_num < ion_num_cutoff:
+                    sort_val = ion[sort_col]
+                    ion_sortvals[temp_ion_count][ion_num].append(sort_val)
+
+    for occ_id, ion_dict in ion_sortvals.iteritems():
+
+        # Loop over all pairs of ions for a given ion split classification.
+        # If the system is larger than ion_num_cutoff, only produce
+        # permutations for the first ion_num_cutoff atoms.
+        for occ_pair in combinations(range(min(occ_id,ion_num_cutoff)),2):
+            dist_diff = array(ion_dict[occ_pair[1]]) - \
+                        array(ion_dict[occ_pair[0]])
+
+            histo, edges = histogram(dist_diff, range=[histmin, histmax],
+                                     bins=histbins, normed=True)
+
+            if pmf:
+                # Since we're taking the log, remove all 0.0 values.
+                low_val_indices = histo <= 0.0
+                high_val_indices = histo > 0.0
+                histo[low_val_indices] = max_eng
+                histo[high_val_indices] = -kBT*log(histo[high_val_indices])
+
+                # Everything must be shifted such that 0 is the minimum value.
+                min_val = min(histo[high_val_indices])
+                histo[high_val_indices] = histo[high_val_indices] + \
+                                          abs(min_val)
+
+            if prefix != None:
+                with open(prefix + "_iondist_occ" + str(occ_pair[0]) +
+                          "-" + str(occ_pair[1]),"w") as out:
+                    for xval, yval in zip(edges, histo):
+                        out.write(str(xval) + " " +
+                                  str(yval) + "\n")
+
+                coord_hist_per_pair[occ_id].append(histo)
+                edges_per_pair[occ_id].append(edges)
+
+    return (dict(coord_hist_per_pair),
+            dict(edges_per_pair))
 
 '''
 # This function is like a coordination histogram but the magnitude of the
