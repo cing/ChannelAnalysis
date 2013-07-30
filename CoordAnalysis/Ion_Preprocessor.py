@@ -25,6 +25,7 @@
 #
 ###############################################################################
 from argparse import ArgumentParser
+from itertools import product
 from re import match
 
 #a great helper function to iterate over chunks of a list
@@ -56,10 +57,9 @@ def add_time_column(data_floats, num_cols=13, verbose=False):
 
     return data_output
 
-# This is a script that produces a regex classification from the input data
-# instead of recomputing it multiple times throughout the script for things
-# like transition counting. It requires sorted or sorted/padded data
-# that are returned from sort_columns and pad_columns functions.
+# This is a script that produces a regex classification from the input data.
+# It requires sorted or sorted/padded data_floats that is returned from
+# sort_columns and pad_columns functions.
 def regex_columns(data_floats, regex_strings, num_cols=13,
                   pad_col=4, sf_col=[5,6], sort_col=3, sort_cut=0.0,
                   max_ions=3, max_coord=9, prefix=None):
@@ -82,7 +82,7 @@ def regex_columns(data_floats, regex_strings, num_cols=13,
             # or the extracellular region of a channel. For this case,
             # a sort_value cutoff must be used to determine where the ion
             # actually is! Note, look at your SF bound ion distributions
-            # to see if sort_cut is set correctly.
+            # to see if sort_cut is set correctly. 0.0 is a safe bet...
             sort_val = ion[sort_col]
             all_zeros = all([ion[col]==0.0 for col in sf_col])
 
@@ -292,6 +292,67 @@ def write_columns(data_lines, outfile=None, write_mode="w"):
         fout.close()
     return True
 
+# This function processes the ion species information from datafiles written
+# using "write_merged_coordination" and writes a single long list of the
+# same length as filenames with the ion species at each timestep. The
+# difference between this function and one like label_columns is that
+# it takes raw data as input. Note that this outputs a sorted list.
+def species_columns(filenames, resid_col=12, sort_col=3,
+                    all_possible_states=[0,1], max_ions=3,
+                    num_cols=13, remove_frames=0,
+                    plus2minus=True, add_time=False):
+
+    data_output = []
+
+    # This is a list of permutations of all species orderings where hypen
+    # is the lack of an ion. Each one is given a numerical state_id.
+    # Example for 2 ion occupancy: --, 00, 01, 10, 11, 0-, 1-.
+    all_species_orders = ["-"*max_ions]
+    for ion_occ in range(max_ions):
+        temp_orders = product(all_possible_states, repeat=ion_occ+1)
+        for order in temp_orders:
+            order_str = "".join([str(col) for col in order])
+            for filler in range(max_ions-len(order_str)):
+                order_str += "-"
+            all_species_orders.append(order_str)
+
+    for filename in filenames:
+        with open(filename,"r") as data_file:
+            data_raw = data_file.readlines()[remove_frames:]
+            data_raw_split = [line.strip().split() for line in data_raw]
+
+        # Newer versions of my MDAnalysis code don't require adding a time
+        # column (in past version only time[0] contained the timestep)
+        if add_time:
+            data_raw_split = add_time_column(data_raw_split, num_cols=num_cols)
+
+        for line in data_raw_split:
+            chunked_line = chunker(line,num_cols)
+            num_ions = len(line)/num_cols
+
+            temp_line = []
+            # Sort by the float of the sort_col column number and take
+            # the deepest max_ions. Usually the outer ions aren't interesting.
+            for ion in sorted(chunked_line,
+                              key=lambda col: float(col[sort_col]),
+                              reverse=plus2minus)[:max_ions]:
+
+                # This is the secret sauce of this method,
+                # merge_coordination files have a last decimal place that
+                # encodes an ion species this is lost when the conversion
+                # to integer takes place in the normal process_input
+                # function.
+                temp_line.append(ion[resid_col][-1])
+
+            # Pad the rest with with hyphens
+            for filler in range(max_ions-num_ions):
+                temp_line.append("-")
+
+            temp_str = "".join(temp_line)
+            data_output.append((temp_str, all_species_orders.index(temp_str)))
+
+    return data_output
+
 # This function preprocesses raw input and returns both the sorted
 # ion data aswell as sorted/padded list of lists. float_cols is a list
 # of column numbers that will be converted to floats, where the rest of the
@@ -403,7 +464,6 @@ if __name__ == '__main__':
     parser.add_argument(
     '--addtime', dest='add_time', action="store_true", default=False,
     help='an optional argument to add time columns to each ion grouping')
-
     # The following arguments are used for regex state stream processing
     parser.add_argument(
     '-i', dest='regex', type=str, nargs="+",
@@ -414,6 +474,12 @@ if __name__ == '__main__':
     parser.add_argument(
     '-sf', dest='sf_col', type=int, nargs="+", default=[5,6],
     help='the coordination integer columns that define the selectivity filter')
+
+    # This is only useful for process_species
+    parser.add_argument(
+    '-r', dest='resid_col', type=int, default=12,
+    help='a zero inclusive column number that contains the ion resid')
+
     args = parser.parse_args()
 
     data_f_padded = process_input(filenames=args.filenames,
