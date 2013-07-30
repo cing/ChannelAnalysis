@@ -10,17 +10,16 @@
 # Example: For 13/26/39/...-column data with type like:
 #          1.0 -0.13 -0.193 0.522 0.0 1.0 0.0 0.0 0.0 2.0 9.0 2.0 1748.0
 #
-#          python State_Grouping.py -f f1.out f2.out -m 3 -c 13 -remove 2000
+#          python State_Grouping.py -f f2.out f3.out -m 3 -c 13 -remove 2000
 #                                  -i "(.[^-0+]|[^-0+].)[-0][-0][-0][-0]"
 #                                  "\+\+[-0][-0][-0][-0]"
 #                                  "(.[^-+0]|[^-+0].)(.[^-+0]|[^-+0].)[-0][-0]"
 #                                  "\+\+(.[^-0+]|[^-0+].)[-0][-0]"
-#                                  -n 1 0 2 1 0 -sf 5 6
+#                                  -sf 5 6
 #
-#          This would read in the finals columns 5 and 6, produce state labels
-#          like ++0100, 101010, ++00--, 1010-- and then match them to the
-#          four passed regular expressions. These regular expressions have
-#          SF occupancy specified by the -n argument. This would produce
+#          This would read in columns 5 and 6 for each ion at a timestep,
+#          produce state labels like ++0100, 101010, ++00--, 1010-- and then
+#          match them to the four passed regular expressions. This produces
 #          data like this where there is N+2 lists where N is the number of
 #          files passed in the -f argument above:
 #
