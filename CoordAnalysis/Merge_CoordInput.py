@@ -2,18 +2,15 @@
 ###############################################################################
 #
 # This script merges two MDAnalysis coordination analysis output files. In
-# practice this is useful when you compute both 1st or 2nd shell coordination
-# and you want to merge coordination in both of those shells. It would be
-# utilized in a workflow before running Ion Preprocessor.
+# practice this is useful when you have data from two ion species. It would be
+# utilized in a workflow before running Ion Preprocessor to seperate
+# data into distinct groups.
 #
 # Example: If you had multiple files with the .out extension that had
-#          matching traj_id + frame_number columns, all coord_cols
-#          which default to column numbers 4 5 6 7 8 9 10 would be summed:
+#          matching traj_id + frame_number columns, atoms would be appended
+#          at that timestep.
 #
 #          python Merge_CoordInput.py -f *.out -o merged.out -c 13 -t 11
-#
-#          Note: Many important arguments are ommitted since they match
-#          the default values for the test case.
 #
 # By Chris Ing, 2013 for Python 2.7
 #
@@ -25,10 +22,10 @@ from collections import defaultdict
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
 
-# This function outputs a single file where all coord_cols are merged
-# for equivalent resids at a given traj and timestep. The outputted data
-# is not sorted.
-def write_merged_coordination(filenames, coord_cols, outfile=None,
+# This function outputs trajectory files for each set of traj_ids
+# with the ions appended to the same line. The resid column now encodes
+# which block of datafiles the ion came from with a trailing integer (0 or 1)
+def write_merged_coordination(filenames0, filenames1, prefix=None,
                               write_mode="w", traj_col=11,
                               resid_col=12, time_col=0, num_cols=13,
                               traj_digits=4, time_digits=8, remove_frames=0):
@@ -36,93 +33,81 @@ def write_merged_coordination(filenames, coord_cols, outfile=None,
     # and the second key is a residue id of an ion observed at that timestep
     # the value is the block of coordination and x,y,z data that are normally
     # attributed with an ion.
-    merged_coord=defaultdict(dict)
+    merged_coord=defaultdict(list)
 
     # Total file length in line numbers
     total_lines = 0
 
-    # Parse the input file and split and float all the columns.
-    # This is the required format for all the functions in this
-    # file.
-    for filename in filenames:
-        with open(filename,"r") as data_file:
-            data_raw = data_file.readlines()[remove_frames:]
-            total_lines += len(data_raw)
-            data_raw_split = [line.strip().split() for line in data_raw]
+    # As you can see, I've hardcoded two sets of filenames that correspond
+    # to ionic coordination for two ion species.
+    for species_num, filenames in enumerate([filenames0, filenames1]):
+        for filename in filenames:
+            with open(filename,"r") as data_file:
+                data_raw = data_file.readlines()[remove_frames:]
+                total_lines += len(data_raw)
+                data_raw_split = [line.strip().split() for line in data_raw]
 
-            # This is a traj_id detection script, we're going to pray
-            # that the file input only has 1 traj_id in it or else
-            # you're getting a bug.
-            auto_traj = None
-            for line in data_raw_split:
-                if (len(line) > traj_col) and (len(line) > time_col):
-                    auto_traj = int(float(line[traj_col]))
-
-            # Now loop over the data and convert everything to integer
-            # except the float_cols columns.
-            for line in data_raw_split:
-                # Loop over all ion's at that timestep
-                for ion in chunker(line,num_cols):
-                    # The default behavior is to read the column traj_id
-                    # but in the case that it doesn't exist, use the auto
-                    #
+                # This is a traj_id detection script, we're going to pray
+                # that the file input only has at least 1 traj_id in it or else
+                # you're getting a bug. Note that if a whole trajectory has no
+                # ion occupancy than this is the only issue.
+                auto_traj = None
+                for line in data_raw_split:
                     if (len(line) > traj_col) and (len(line) > time_col):
-                        # Prepare a unique identifier for that line, if you
-                        # have more than 9999 trajectories or 99999999 frames
-                        # then your data may not be correctly sorted since
-                        # the identifier is a string and must be sorted
-                        # alphanumerically at the end of the function.
-                        u_id = ion[traj_col].split(".")[0].zfill(traj_digits)+\
-                               ion[time_col].split(".")[0].zfill(time_digits)
-                    elif auto_traj is not None:
-                        u_id = str(auto_traj).zfill(traj_digits)+\
-                               ion[time_col].split(".")[0].zfill(time_digits)
-                    else:
-                        raise ValueError("You input a file with no traj_id")
+                        auto_traj = int(float(line[traj_col]))
 
-                    if len(line) > resid_col:
-                        resid = int(float(ion[resid_col]))
-
-                        # If that resid exists already, add the coord_cols
-                        if resid in merged_coord[u_id]:
-                            old_ion = merged_coord[u_id][resid]
-                            for coord_col in coord_cols:
-                                old_coord = float(old_ion[coord_col])
-                                new_coord = float(ion[coord_col])
-                                old_ion[coord_col] = str(old_coord + new_coord)
-                            merged_coord[u_id][resid] = old_ion
-                        # Otherwise, just create it.
+                # Now loop over the data and convert everything to integer
+                # except the float_cols columns.
+                for line in data_raw_split:
+                    # Loop over all ion's at that timestep
+                    for ion in chunker(line,num_cols):
+                        # The default behavior is to read the column traj_id
+                        # but in the case that it doesn't exist, use the auto
+                        #
+                        if (len(line) > traj_col) and (len(line) > time_col):
+                            # Prepare a unique identifier for that line, if you
+                            # have more than 9999 trajectories or 99999999
+                            # frames then your data may not be correctly sorted
+                            # since the identifier is a string and must be
+                            # sorted alphanumerically at the end of the
+                            # function.
+                            u_id_traj = ion[traj_col].split(".")[0]
+                            u_id_time = ion[time_col].split(".")[0]
+                            u_id = u_id_traj.zfill(traj_digits) + "-" + \
+                                   u_id_time.zfill(time_digits)
+                        elif auto_traj is not None:
+                            u_id_traj = str(auto_traj)
+                            u_id_time = ion[time_col].split(".")[0]
+                            u_id = u_id_traj.zfill(traj_digits) + "-" + \
+                                   u_id_time.zfill(time_digits)
                         else:
-                            merged_coord[u_id][resid] = ion
-                    else:
-                        # In the case that no resid exists, a dictionary entry
-                        # for the u_id should still be made. Though these
-                        # lines will basically contribute nothing other than
-                        # channel occupancy calculations.
-                        merged_coord[u_id][""] = ion
+                            raise ValueError("input file detected no traj_id")
 
-    # It's entirely possible that the output may have more lines than the input
-    # since we're doing a union of the two sets.
-    #print len(merged_coord), total_lines
+                        ion[resid_col] = ion[resid_col]+str(species_num)
+                        merged_coord[u_id].append(ion)
 
-    # If a filename exists, open it, write to it, and close it.
-    # Otherwise, just print.
-    if outfile is not None:
-        fout = open(outfile,write_mode)
+    file_dict = {}
+    for u_id, resid_list in sorted(merged_coord.iteritems()):
 
-    for u_id, resid_dict in sorted(merged_coord.iteritems()):
-        for ions in resid_dict.values():
-            if outfile == None:
-                print " ".join(ions), " "
+        if prefix is not None:
+            traj_id = u_id.split("-")[0]
+            if traj_id not in file_dict:
+                file_dict[traj_id] = open(prefix+"_n"+traj_id,write_mode)
+
+        for ions in resid_list:
+            if prefix is not None:
+                file_dict[traj_id].write(" ".join(ions) + " ")
             else:
-                fout.write(" ".join(ions) + " ")
-        if outfile == None:
-            print "\n",
-        else:
-            fout.write("\n")
+                print " ".join(ions), " "
 
-    if outfile is not None:
-        fout.close()
+        if prefix is not None:
+            file_dict[traj_id].write("\n")
+        else:
+            print "\n",
+
+    if prefix is not None:
+        file_dict[traj_id].close()
+
     return True
 
 if __name__ == '__main__':
@@ -131,8 +116,11 @@ if __name__ == '__main__':
     and makes it nice and pretty for subsequent analysis.')
 
     parser.add_argument(
-    '-f', dest='filenames', type=str, nargs="+", required=True,
-    help='a filename of coordination data from MDAnalysis trajectory data')
+    '-f1', dest='filenames1', type=str, nargs="+", required=True,
+    help='filenames of coordination data for ion species 1')
+    parser.add_argument(
+    '-f2', dest='filenames2', type=str, nargs="+", required=True,
+    help='filenames of coordination data for ion species 2')
     parser.add_argument(
     '-c', dest='num_cols', type=int, default=13,
     help='the number of columns per ion in the input')
@@ -146,19 +134,15 @@ if __name__ == '__main__':
     '-time', dest='time_col', type=int, default=0,
     help='a zero inclusive column number that contains the frame number')
     parser.add_argument(
-    '-coord', dest='coord_cols', type=int, nargs="+", default=[4,5,6,7,8,9,10],
-    help='all the columns with coordination counts')
-    parser.add_argument(
-    '-o', dest='outfile', type=str, default=None,
-    help='the file to output the merged input files')
+    '-p', dest='prefix', type=str, default="merged_ion_species",
+    help='this is the prefix of the histogram output')
     parser.add_argument(
     '-remove', dest='remove_frames', type=int, default=0,
     help='this is a number of frames to remove from the start of the data')
     args = parser.parse_args()
 
-    write_merged_coordination(args.filenames,
-                              args.coord_cols,
-                              outfile=args.outfile,
+    write_merged_coordination(args.filenames1, args.filenames2,
+                              prefix=args.prefix,
                               num_cols=args.num_cols,
                               traj_col=args.traj_col,
                               time_col=args.time_col,
