@@ -10,7 +10,7 @@ setup(
     url='https://github.com/cing/ChannelAnalysis/',
     license='LICENSE',
     description='An analysis pipeline for studying ion channels.',
-    long_description=open('README.markdown').read(),
+    long_description=open('README.txt').read(),
     install_requires=[
         "numpy",
         "scipy",
