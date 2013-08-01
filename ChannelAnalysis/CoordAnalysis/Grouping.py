@@ -36,7 +36,7 @@ from numpy import mean
 from scipy.stats import sem
 from collections import defaultdict
 from re import match
-from Ion_Preprocessor import *
+from ChannelAnalysis.CoordAnalysis.Preprocessor import *
 
 # This function counts state occupancy in each trajectory. It will return the
 # state populations for each trajectory and then the associated stats.

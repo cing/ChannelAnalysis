@@ -27,7 +27,7 @@ from collections import defaultdict
 from numpy import histogram
 from itertools import product
 from re import match
-from Ion_Preprocessor import *
+from ChannelAnalysis.CoordAnalysis.Preprocessor import *
 
 def compute_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
                            sort_col=3, max_ions=3, traj_col=11, histmin=-1.50,

@@ -23,7 +23,7 @@ from collections import defaultdict
 from numpy import histogram, histogram2d, sqrt, linspace, zeros, digitize, log
 from numpy import where, isinf, array
 from itertools import combinations
-from Ion_Preprocessor import *
+from ChannelAnalysis.CoordAnalysis.Preprocessor import *
 
 # This returns the sort_column as a time series, useful
 # for making scatterplot time series of ionic positions.

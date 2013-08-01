@@ -29,8 +29,8 @@
 # By Chris Ing, 2013 for Python 2.7
 #
 ################################################################################
-from Ion_Preprocessor import *
-from State_Grouping import *
+from ChannelAnalysis.CoordAnalysis.Preprocessor import *
+from ChannelAnalysis.CoordAnalysis.Grouping import *
 from re import match
 from argparse import ArgumentParser
 from collections import defaultdict

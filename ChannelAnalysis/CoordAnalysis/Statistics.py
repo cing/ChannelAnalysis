@@ -23,7 +23,7 @@ from argparse import ArgumentParser
 from numpy import mean
 from scipy.stats import sem
 from collections import defaultdict
-from Ion_Preprocessor import *
+from ChannelAnalysis.CoordAnalysis.Preprocessor import *
 
 # This counts of the number of ions at each step and bins these based on
 # integer occupancy values. This function utilizes the traj_col variable

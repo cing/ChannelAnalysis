@@ -21,7 +21,7 @@
 from argparse import ArgumentParser
 from collections import defaultdict
 from numpy import histogram, convolve, ones
-from ChannelAtom_Preprocessor import *
+from ChannelAnalysis.PoreAnalysis.Preprocessor import *
 
 # a great helper function to iterate over chunks of a list
 def chunker(seq, size):

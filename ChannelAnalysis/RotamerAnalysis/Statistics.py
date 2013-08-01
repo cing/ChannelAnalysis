@@ -28,7 +28,7 @@ from argparse import ArgumentParser
 from numpy import mean
 from scipy.stats import sem
 from collections import defaultdict
-from Rotamer_Preprocessor import *
+from ChannelAnalysis.RotamerAnalysis.Preprocessor import *
 
 # This function is useful for counting the ratio of rotameric states
 # for each of the input trajectory files with respect to the last state.

@@ -1,5 +1,4 @@
-# Import RotamerAnalysis core modules
-from Rotamer_Preprocessor import *
-from Rotamer_Histograms import *
-from Rotamer_Vs_Time import *
-from Rotamer_Survival import *
+from Preprocessor import *
+from Survival import *
+from Histograms import *
+from Statistics import *

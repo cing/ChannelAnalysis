@@ -26,7 +26,7 @@ from argparse import ArgumentParser
 from scipy.optimize import curve_fit
 from collections import defaultdict
 from itertools import groupby
-from Rotamer_Preprocessor import *
+from ChannelAnalysis.RotamerAnalysis.Preprocessor import *
 import numpy as np
 
 # These are our fitting functions for multiple levels of exponential decay.

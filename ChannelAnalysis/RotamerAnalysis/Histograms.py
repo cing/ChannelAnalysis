@@ -23,7 +23,7 @@
 ###############################################################################
 from argparse import ArgumentParser
 from numpy import histogram, histogram2d, log
-from Rotamer_Preprocessor import *
+from ChannelAnalysis.RotamerAnalysis.Preprocessor import *
 
 # This writes chi1 or chi2 population densities in 1D
 # (kind of a weaker version of write_rotamer_rotamer_histogram below)
