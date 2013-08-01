@@ -20,12 +20,48 @@
 ###############################################################################
 from argparse import ArgumentParser
 from collections import defaultdict
-from numpy import histogram
+from numpy import histogram, convolve, ones
 from ChannelAtom_Preprocessor import *
 
-#a great helper function to iterate over chunks of a list
+# a great helper function to iterate over chunks of a list
 def chunker(seq, size):
     return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
+
+# a helper method for extracting a timeseries window.
+def window(size):
+    return ones(size)/float(size)
+
+# This returns the sort_column as a time series, useful
+# for making scatterplot time series of channel atom positions.
+def compute_atom_timeseries(data_lines, sort_col, traj_col,
+                            col_skip=2, num_cols=3, window_size=100):
+
+    # These are dictionaries of dict where the key is the traj_number
+    # and the subdict is ion_number and te value is a LIST of ion positions,
+    # or associated time values in the case of the associated time_per_traj
+    atom_pos_per_traj = defaultdict(dict)
+    time_per_traj = defaultdict(dict)
+
+    for line in data_lines:
+        traj_id = line[traj_col]
+        for atom_num, atom in enumerate(list(chunker(line[col_skip:],
+                                                     num_cols))):
+            sort_val = atom[sort_col]
+            if atom_num not in atom_pos_per_traj[traj_id]:
+                atom_pos_per_traj[traj_id][atom_num] = [sort_val]
+                time_per_traj[traj_id][atom_num] = [line[0]]
+            else:
+                atom_pos_per_traj[traj_id][atom_num].append(sort_val)
+                time_per_traj[traj_id][atom_num].append(line[0])
+
+    if convolve != None:
+        for t_id, atoms in atom_pos_per_traj.iteritems():
+            for a_id, atom_ts in atoms.iteritems():
+                atom_pos_per_traj[t_id][a_id] = list(convolve(atom_ts,
+                                                     window(window_size),
+                                                     'same'))
+
+    return (dict(atom_pos_per_traj), dict(time_per_traj))
 
 # Not a complicated function for getting histogrammed data for the sort_col
 # in a particular group of data_lines. This does not distinguish between
@@ -46,7 +82,7 @@ def compute_allatom_histogram(data_lines, sort_col,
     z_per_atom = defaultdict(list)
 
     for line in data_lines:
-        for atom in chunker(line[2:],num_cols):
+        for atom in chunker(line[col_skip:],num_cols):
             sort_val = atom[sort_col]
             atom_sortvals.append(sort_val)
 
