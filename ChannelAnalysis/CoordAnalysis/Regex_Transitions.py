@@ -30,7 +30,7 @@
 #
 ################################################################################
 from Ion_Preprocessor import *
-from Regex_Grouping import *
+from State_Grouping import *
 from re import match
 from argparse import ArgumentParser
 from collections import defaultdict
