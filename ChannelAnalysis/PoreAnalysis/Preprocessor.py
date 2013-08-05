@@ -22,6 +22,14 @@
 #
 ###############################################################################
 from argparse import ArgumentParser
+import gzip
+
+# A helper function to open with gzip if the file is gzipped
+def file_opener(fname):
+    if fname.endswith('.gz'):
+        return gzip.open(fname)
+    else:
+        return open(fname)
 
 def process_channelatoms(filenames, remove_frames=0):
 
@@ -34,7 +42,7 @@ def process_channelatoms(filenames, remove_frames=0):
     # This is the required format for all the functions in this
     # file.
     for filename in filenames:
-        with open(filename,"r") as data_file:
+        with file_opener(filename) as data_file:
             data_raw = data_file.readlines()[remove_frames:]
             data_raw_split = [line.strip().split() for line in data_raw]
 

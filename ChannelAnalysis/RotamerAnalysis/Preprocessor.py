@@ -28,6 +28,14 @@
 ###############################################################################
 from argparse import ArgumentParser
 from itertools import chain, repeat, islice, groupby
+import gzip
+
+# A helper function to open with gzip if the file is gzipped
+def file_opener(fname):
+    if fname.endswith('.gz'):
+        return gzip.open(fname)
+    else:
+        return open(fname)
 
 # This helper function will allow me to iterate over a fixed window
 # http://stackoverflow.com/q/6998245/1086154
@@ -60,7 +68,7 @@ def process_rotamers(filenames, chi1_cols=[], chi2_cols=[],
     # This is the required format for all the functions in this
     # file.
     for filename in filenames:
-        with open(filename,"r") as data_file:
+        with file_opener(filename) as data_file:
             data_raw = data_file.readlines()[remove_frames:]
             data_raw_split = [line.strip().split() for line in data_raw]
 
