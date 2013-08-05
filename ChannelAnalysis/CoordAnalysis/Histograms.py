@@ -544,8 +544,8 @@ def compute_iondist_histograms(data_lines, sort_col,
                         out.write(str(xval) + " " +
                                   str(yval) + "\n")
 
-                coord_hist_per_pair[occ_id].append(histo)
-                edges_per_pair[occ_id].append(edges)
+            coord_hist_per_pair[occ_id].append(histo)
+            edges_per_pair[occ_id].append(edges)
 
     return (dict(coord_hist_per_pair),
             dict(edges_per_pair))
