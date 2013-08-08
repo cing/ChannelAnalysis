@@ -500,21 +500,18 @@ def plot_ionsplit_histograms(ionsplit_histo, occ_populations,
             for ion_num in range(len(ionsplit_histo[1][occ_id])):
                 channel_occ_hist_x = (array(ionsplit_histo[1][occ_id][ion_num][1:]))
                 diff = (channel_occ_hist_x[1]-channel_occ_hist_x[0])/2.0
-                channel_occ_hist_x_shift = (channel_occ_hist_x - diff)*-1
+                channel_occ_hist_x_shift = (channel_occ_hist_x - diff)*-10
                 channel_occ_hist_y = (array(ionsplit_histo[0][occ_id][ion_num]))
                 ax.plot(channel_occ_hist_x_shift, channel_occ_hist_y, linewidth=2.5)
 
             ax.grid(True)
             ax.set_ylim(bottom=0)
             ax.set_ylabel(str(occ_id)+" Ion Density")
+            ax.set_xlabel("Axial position (Ang)")
             plt.setp(ax.get_xticklabels(), visible=False)
             plt.setp(ax.get_yticklabels(), visible=False)
-            ax.xaxis.set_major_locator(MultipleLocator(0.2))
-            ax.xaxis.set_minor_locator(MultipleLocator(0.1))
-            ax.set_ylim([-1.1, 1.0])
-            ax.set_yticks([x/10.0 for x in range(-10,10,2)])
-            ax.set_xlim([-5,max_length+5])
-            ax.set_xticks(range(0, int(50*round(max_length/50)), 50))
+            ax.xaxis.set_major_locator(MultipleLocator(2))
+            ax.xaxis.set_minor_locator(MultipleLocator(1))
 
             plt.text(0.15, 0.9,
                      r"Pop: {:.1f}% $\pm$ {:.1f}%".format(mean_val,stderr_val),
@@ -540,10 +537,10 @@ def plot_ionsplit_histograms(ionsplit_histo, occ_populations,
 # This plots a stacked timeseries of trajectory properties in the main column
 # and histograms of this data in a second column. Sorry for the god-awful
 # number of arguments...
-def plot_oxy_timeseries(alloxygen_ts,
+def plot_oxy_timeseries(alloxygen_ts, sf_ts,
                         time_conv=0.02,
                         prefix=None,
-                        plot_title="Stacked Timeseries",
+                        plot_title="Oxygen Timeseries",
                         max_coord=4,
                         max_length=500,
                         data_skip=10,
@@ -559,7 +556,8 @@ def plot_oxy_timeseries(alloxygen_ts,
         # Initialize the figure and compute the number of rows that will
         # be needed in the figure to capture all the data.
         fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
+        gs = gridspec.GridSpec(2, 1, height_ratios=[4,1])
+        ax1 = plt.subplot(gs[0])
 
         # Prepare a list of binary values and use it to compute how many
         # are above the occupancy population cutoff.
@@ -578,24 +576,51 @@ def plot_oxy_timeseries(alloxygen_ts,
                 atom_ts_y = oxygens[0][traj_id][atom_id][::int(data_skip)]
                 atom_ts_x_scale = [time_conv*pos for pos in atom_ts_x]
                 atom_ts_y_flip = [-10*pos for pos in atom_ts_y]
-                ax.scatter(atom_ts_x_scale, atom_ts_y_flip, s=0.5,
+                ax1.scatter(atom_ts_x_scale, atom_ts_y_flip, s=0.5,
                            color=colors[color_id])
 
-        ax.grid(True)
-        ax.set_ylabel("Axial position (Ang)")
-        ax.set_xlabel("Time (ns)")
-        ax.xaxis.set_major_locator(MultipleLocator(50))
-        ax.xaxis.set_minor_locator(MultipleLocator(25))
-        ax.yaxis.set_major_locator(MultipleLocator(2))
-        ax.yaxis.set_minor_locator(MultipleLocator(1))
-        ax.set_ylim([-8, 12])
-        ax.set_yticks([x/1.0 for x in range(-8,13,2)])
-        ax.set_xlim([-5,max_length+5])
-        #ax.set_xticks(range(0, int(50*round(max_length/50)), 50))
-        ax.yaxis.grid(True,'minor')
-        ax.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax.xaxis.grid(True,'minor')
-        ax.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax1.set_ylabel("Axial position (nm)")
+        #ax1.set_ylim([-8, 12])
+        ax1.set_ylim([-5, 7])
+        #ax1.set_yticks([x/1.0 for x in range(-8,13,2)])
+        ax1.set_yticks([x/1.0 for x in range(-5,8,1)])
+        ax1.set_xlim([-5,max_length+5])
+        ax1.set_xticks(range(0, int(50*round(max_length/50)), 50))
+        ax1.yaxis.set_major_locator(MultipleLocator(2))
+        ax1.yaxis.set_minor_locator(MultipleLocator(1))
+        ax1.xaxis.set_major_locator(MultipleLocator(50))
+        ax1.xaxis.set_minor_locator(MultipleLocator(25))
+        ax1.set_axisbelow(True)
+        ax1.yaxis.grid(True,'minor')
+        ax1.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax1.xaxis.grid(True,'minor')
+        ax1.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        plt.setp(ax1.get_xticklabels(), visible=False)
+
+        ax2 = plt.subplot(gs[1], sharex=ax1)
+        for color_id, atom_id in enumerate(sorted(sf_ts[0][traj_id].keys())):
+            atom_ts_x = sf_ts[1][traj_id][atom_id][::int(data_skip)]
+            atom_ts_y = sf_ts[0][traj_id][atom_id][::int(data_skip)]
+            atom_ts_x_scale = [time_conv*pos for pos in atom_ts_x]
+            # Awkwardly, the units for these files are incorrect and should
+            # be fixed. They are in Ang already.
+            atom_ts_y_flip = [-1*pos for pos in atom_ts_y]
+            ax2.scatter(atom_ts_x_scale, atom_ts_y_flip, s=0.5,
+                       color=colors[color_id])
+
+        ax2.set_ylabel("C.O.M. Dev. (Ang)")
+        ax2.set_xlabel("Time (ns)")
+        ax2.set_ylim([-5, 5])
+        ax1.set_xlim([-5,max_length+5])
+        ax1.set_xticks(range(0, int(50*round(max_length/50)), 50))
+        ax2.set_yticks([x/1.0 for x in range(-5,6,2)])
+        ax2.yaxis.set_major_locator(MultipleLocator(1.0))
+        ax2.yaxis.set_minor_locator(MultipleLocator(0.5))
+        ax2.yaxis.grid(True,'minor')
+        ax2.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax2.xaxis.grid(True,'minor')
+        ax2.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+
 
         plt.subplots_adjust(hspace = 0.1, wspace = 0.02,
                             left = 0.1, bottom = 0.08,
