@@ -1,10 +1,9 @@
 #!/usr/bin/python
 ###############################################################################
 #
-# This script performs time-series data on one, multiple, or merged
-# data from the Row_Preprocessor.py script. The purpose of this tool
-# is to extract several important properties of this data as a function
-# of time, as well as some basic statistical properties over
+# The purpose of this tool is to extract several important
+# properties of this data as a function of time,
+# as well as some basic statistical properties over
 # the given ensembles. In terms of script history, this combines
 # ion_occupancy_vs_time.py, Compute_Average_Sod_in_SF.py
 #
@@ -209,7 +208,6 @@ def compute_occ_vs_time(data_lines, num_cols=13,
             count_files[key].close()
 
     return (dict(occ_per_traj), dict(time_per_traj))
-
 
 if __name__ == '__main__':
     parser = ArgumentParser(
