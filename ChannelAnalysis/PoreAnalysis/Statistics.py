@@ -32,6 +32,13 @@ def rmsd_counter(data_lines, colskip=2, num_cols=3,
     rmsd_means = defaultdict(int)
     rmsd_stderrs = defaultdict(int)
 
+    # First determine the mean displacement for the entire dataset.
+    traj_means = 0.0
+    for line in data_lines:
+        col_blocks = list(chunker(line[colskip:],num_cols))
+        traj_means += mean([block[sort_col] for block in col_blocks])
+    traj_means /= len(data_lines)
+
     for line in data_lines:
         traj_id = line[traj_col]
         temp_deviation = []
@@ -48,13 +55,7 @@ def rmsd_counter(data_lines, colskip=2, num_cols=3,
             temp_deviation.append(float(col_blocks[chain_num][sort_col]))
             #print float(col_blocks[chain_num][sort_col]),
 
-        # This subtracts the t0 deviations for the first line detected
-        # of a particular traj_id.
-        if traj_id not in rmsd_totals:
-            #print "Detected t0", temp_deviation
-            t0_deviation = temp_deviation
-        shifted_deviation = square(array(temp_deviation)-array(t0_deviation))
-
+        shifted_deviation = square(array(temp_deviation)-traj_means)
         # If chain_num is set, return deviation without dviding.
         if chain_num is None:
             rmsd = sqrt(sum(shifted_deviation))/len(col_blocks)
