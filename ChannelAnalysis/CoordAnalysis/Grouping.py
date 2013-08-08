@@ -54,8 +54,8 @@ def state_counter(data_floats, data_states, all_possible_states, traj_col=11):
 
     for line, state_label, state_label2 in zip(data_floats, data_state_ids, data_state_labels):
         traj_id = line[traj_col]
-        if state_label == 13:
-            print line, state_label2
+        #if state_label == 13:
+        #    print line, state_label2
         count_totals[traj_id][state_label] += 1
 
     # This fills zero in for all known occupancy states for all
@@ -188,7 +188,10 @@ if __name__ == '__main__':
 
         print "Possible ion species arrangements: ", all_species_orders
 
-        print state_counter(data_f_padded, data_species,
+        species_results = state_counter(data_f_padded, data_species,
                             range(len(all_species_orders)),
                             traj_col=args.traj_col)
+
+        for traj_id, block in species_results[0].iteritems():
+            print traj_id, block
 
