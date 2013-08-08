@@ -24,7 +24,7 @@ def chunker(seq, size):
 
 # This computes the root mean square deviation of each of the sort_col
 # columns of each line.
-def rmsd_counter(data_lines, colskip=2, num_cols=3,
+def rmsd_counter(data_lines, col_skip=2, num_cols=3,
                  sort_col=2, traj_col=1, chain_num=None, prefix=None):
 
     rmsd_totals = defaultdict(list)
@@ -33,18 +33,18 @@ def rmsd_counter(data_lines, colskip=2, num_cols=3,
     rmsd_stderrs = defaultdict(int)
 
     # First determine the mean displacement for the entire dataset.
-    traj_means = 0.0
+    traj_mean = 0.0
     for line in data_lines:
-        col_blocks = list(chunker(line[colskip:],num_cols))
-        traj_means += mean([block[sort_col] for block in col_blocks])
-    traj_means /= len(data_lines)
+        col_blocks = list(chunker(line[col_skip:],num_cols))
+        traj_mean += mean([block[sort_col] for block in col_blocks])
+    traj_mean /= len(data_lines)
 
     for line in data_lines:
         traj_id = line[traj_col]
         temp_deviation = []
 
         # Split the line into chunks of size equal to num_cols
-        col_blocks = list(chunker(line[colskip:],num_cols))
+        col_blocks = list(chunker(line[col_skip:],num_cols))
 
         # This script can calculate statistics for 1 chain, or all chains
         # averaged, depending on if the chain_num argument is set.
@@ -55,7 +55,7 @@ def rmsd_counter(data_lines, colskip=2, num_cols=3,
             temp_deviation.append(float(col_blocks[chain_num][sort_col]))
             #print float(col_blocks[chain_num][sort_col]),
 
-        shifted_deviation = square(array(temp_deviation)-traj_means)
+        shifted_deviation = square(array(temp_deviation)-traj_mean)
         # If chain_num is set, return deviation without dviding.
         if chain_num is None:
             rmsd = sqrt(sum(shifted_deviation))/len(col_blocks)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
     sf_processed = process_channelatoms(args.filenames,
                                         remove_frames=args.remove_frames)
 
-    if True:
+    if False:
         print "All Chains Mean Deviation"
         sliding_stats = rmsd_counter(sf_processed,
                            num_cols=args.num_cols,
