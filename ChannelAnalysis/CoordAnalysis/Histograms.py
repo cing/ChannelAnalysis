@@ -448,7 +448,7 @@ def compute_ionsplit_2dhistograms(data_lines, sort_col,
 
             # Everything must be shifted such that 0 is the true minimum value.
             min_val = min(histo[high_val_indices])
-            histo[high_val_indices] = histo[high_val_indices] + abs(min_val)
+            histo[high_val_indices] = histo[high_val_indices] - abs(min_val)
 
             if prefix != None:
                 with open(prefix + "_ionsplit_occ" + str(occ_pair[0]) +
