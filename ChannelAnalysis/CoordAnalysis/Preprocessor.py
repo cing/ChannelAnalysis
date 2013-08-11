@@ -28,6 +28,7 @@ from argparse import ArgumentParser
 from itertools import product
 from re import match
 import gzip
+import pandas
 
 #a great helper function to iterate over chunks of a list
 def chunker(seq, size):
