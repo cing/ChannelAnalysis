@@ -92,6 +92,7 @@ def rotamer_counter(data_lines, data_states, traj_col=11, prefix=None):
         state_total = sum(states)
         count_totals[traj_id][state_total] += 1
 
+    print count_totals
     return count_totals_to_percents(count_totals)
 
 # This is a helper function that takes the datatype generated in
@@ -177,6 +178,20 @@ def compute_rotamer_vs_time(data_lines, data_states, traj_col, prefix=None):
             count_files[key].close()
 
     return (dict(rotstate_per_traj), dict(time_per_traj))
+
+# Returns the population percentages across the entire dataset from the
+# label_states array.
+def label_statistics(data_states):
+    cols_per_line = len(data_states[0])
+    counts_per_state = defaultdict(float)
+    for line in data_states:
+        for state in line:
+            counts_per_state[state] += 1.0
+
+    for state in counts_per_state.keys():
+        counts_per_state[state] /= len(data_states)*cols_per_line
+
+    return dict(counts_per_state)
 
 if __name__ == '__main__':
     parser = ArgumentParser(
