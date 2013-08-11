@@ -4,3 +4,4 @@ from Statistics import *
 from Histograms import *
 from Grouping import *
 from Transitions import *
+from RegexHistograms import *
