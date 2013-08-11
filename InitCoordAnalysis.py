@@ -8,10 +8,9 @@
 # By Chris Ing, 2013 for Python 2.7
 #
 ################################################################################
-from CoordAnalysis import *
-from RotamerAnalysis import *
-from PoreAnalysis import *
-from CoordAnalysis import Coord_Plots
+from ChannelAnalysis.CoordAnalysis import *
+from ChannelAnalysis.RotamerAnalysis import *
+from ChannelAnalysis.PoreAnalysis import *
 from sys import argv
 from ConfigParser import ConfigParser
 
@@ -40,6 +39,7 @@ def main(cfgfile):
     # Extract all the properties needed for rotamer studies.
     try:
         r = ConfigMap(cfgfile, 'rotamer_config')
+        p = ConfigMap(cfgfile, 'plot_config')
         #print r
         filenames_rot = ConfigMap(cfgfile, 'rotamer_input_files').values()
         filenames_rot_pre = [r["input_file_prefix"] +
@@ -66,6 +66,9 @@ def main(cfgfile):
                                      chi2_cols,
                                      state_dividers)
 
+        label_stats = label_statistics(data_f_states)
+
+        '''
         print "Computing dunking populations"
         dunking_counts = rotamer_counter(data_rotamers,
                                          data_f_states,
@@ -73,13 +76,47 @@ def main(cfgfile):
 
         dunking_ts = compute_rotamer_vs_time(data_rotamers,
                                           data_f_states,
-                                          traj_col=int(r["traj_col"]),
-                                          prefix=r["out_prefix_rot"]+"rotamer")
+                                          traj_col=int(r["traj_col"]))
+        #                                  prefix=r["out_prefix_rot"]+"rotamer")
+        '''
 
+        rotamer_2dhisto = compute_rotamer_rotamer_histogram(data_rotamers,
+                                                           chi1_cols=chi1_cols,
+                                                           chi2_cols=chi2_cols)
+
+        plot_rotamer_2dhistograms(rotamer_2dhisto, state_dividers, label_stats,
+                    prefix=p["out_prefix_plot"]+"figure8",
+                    plot_title=p["fig_title_prefix"]+" N181 Chi1-Chi2 Histograms")
+
+    raise " "
+
+    # Extract SF residue time series information
+    try:
+        o = ConfigMap(cfgfile, 'oxygen_config')
+        filenames_sf = ConfigMap(cfgfile, 'sf_residues').values()
+        filenames_sf_pre = [o["input_file_prefix"] +
+                             name for name in filenames_sf]
+
+    except:
+        print "No data for SF residues specified"
+    else:
+        print "Computing z deviation timeseries for sf chains"
+        sf_processed = process_channelatoms(filenames_sf_pre,
+                                         remove_frames=int(o["remove_frames"]))
+
+        sf_ts = compute_atom_timeseries(sf_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"]),
+                                          mean_shift=True)
 
     # Here we will attempt to extract as many oxygen positions in the
     # datafile as possible and append them to this list.
     allatom_histos = []
+
+    # The same thing is true for oxygen atom Z timeseries data.
+    alloxygen_ts = []
 
     # Extract residue 1 oxygen positions.
     try:
@@ -100,6 +137,12 @@ def main(cfgfile):
 
         allatom_histos.append(compute_allatom_histogram(oxygen_res1_processed,
                                           int(o["sort_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"])))
+
+        alloxygen_ts.append(compute_atom_timeseries(oxygen_res1_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
@@ -125,6 +168,12 @@ def main(cfgfile):
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
+        alloxygen_ts.append(compute_atom_timeseries(oxygen_res2_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"])))
+
     # Extract residue 3 oxygen positions.
     try:
         o = ConfigMap(cfgfile, 'oxygen_config')
@@ -144,6 +193,13 @@ def main(cfgfile):
 
         allatom_histos.append(compute_allatom_histogram(oxygen_res3_processed,
                                           int(o["sort_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"])))
+
+
+        alloxygen_ts.append(compute_atom_timeseries(oxygen_res3_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
@@ -169,6 +225,12 @@ def main(cfgfile):
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
+        alloxygen_ts.append(compute_atom_timeseries(oxygen_res4_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"])))
+
     # Extract residue 5 oxygen positions.
     try:
         o = ConfigMap(cfgfile, 'oxygen_config')
@@ -191,6 +253,21 @@ def main(cfgfile):
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
+        alloxygen_ts.append(compute_atom_timeseries(oxygen_res5_processed,
+                                          int(o["sort_col"]),
+                                          int(o["traj_col"]),
+                                          col_skip=int(o["col_skip"]),
+                                          num_cols=int(o["num_cols_per_ion"])))
+
+    print "Preparing plots for Oxygen Histograms"
+    p = ConfigMap(cfgfile, 'plot_config')
+
+    plot_oxy_timeseries(alloxygen_ts, sf_ts,
+                     time_conv=float(p["time_conv"]),
+                     prefix=p["out_prefix_plot"]+"figure7",
+                     plot_title=p["fig_title_prefix"]+" E,L Oxygen Timeseries",
+                     max_coord=int(p["max_coord"]),
+                     max_length=int(p["max_length"]))
 
     # Extract all properties needed for 1st shell coordination studies.
     try:
@@ -226,6 +303,19 @@ def main(cfgfile):
                                  add_time=str2bool(g["add_time"]),
                                  padded=True)
 
+        iondist_histo = compute_iondist_histograms(data_1st,
+                                                int(g["sort_col"]),
+                                       num_cols=int(g["num_cols_per_ion"]),
+                                       occ_lower_cut=int(p["occ_lower_cut"]),
+                                       occ_higher_cut=int(p["occ_higher_cut"]),
+                                       histbins=150,
+                                       prefix=g["out_prefix_1st"]+"1dhisto")
+
+
+        plot_iondist_histograms(iondist_histo,
+                                   prefix=p["out_prefix_plot"]+"figure6",
+                plot_title=p["fig_title_prefix"]+" Pair Distance 1D Histograms")
+
         ionsplit_2dhisto = compute_ionsplit_2dhistograms(data_1st,
                                                 int(g["sort_col"]),
                                        num_cols=int(g["num_cols_per_ion"]),
@@ -238,18 +328,17 @@ def main(cfgfile):
                                    prefix=p["out_prefix_plot"]+"figure3",
                              plot_title=p["fig_title_prefix"]+" 2D Histograms")
 
-        raise " "
         print "Channel Occupancy and Figure 1 Calculations"
         counts_1st = occ_counter(data_1st,
                                  num_cols=int(g["num_cols_per_ion"]),
                                  traj_col=int(g["traj_col"]),
-                                 sf_col=[],
-                                 prefix=g["out_prefix_1st"]+"chanocc")
+                                 sf_col=[])
+        #                         prefix=g["out_prefix_1st"]+"chanocc")
 
         occ_1st = compute_occ_vs_time(data_1st,
                                       num_cols=int(g["num_cols_per_ion"]),
-                                      traj_col=int(g["traj_col"]),
-                                      prefix=g["out_prefix_1st"]+"chanocc")
+                                      traj_col=int(g["traj_col"]))
+        #                              prefix=g["out_prefix_1st"]+"chanocc")
 
         ion_ts_1st = compute_ion_timeseries(data_1st,
                                            int(g["sort_col"]),
@@ -304,14 +393,14 @@ def main(cfgfile):
         counts_sf_1st = occ_counter(data_1st,
                                     num_cols=int(g["num_cols_per_ion"]),
                                     traj_col=int(g["traj_col"]),
-                                    sf_col=sf_cols,
-                                    prefix=g["out_prefix_1st"]+"sfocc")
+                                    sf_col=sf_cols)
+        #                            prefix=g["out_prefix_1st"]+"sfocc")
 
         occ_sf_1st = compute_occ_vs_time(data_1st,
                                          num_cols=int(g["num_cols_per_ion"]),
                                          traj_col=int(g["traj_col"]),
-                                         sf_col=sf_cols,
-                                         prefix=g["out_prefix_1st"]+"sfocc")
+                                         sf_col=sf_cols)
+        #                                 prefix=g["out_prefix_1st"]+"sfocc")
 
         print "Writing multiple 1D histograms for ion coordination integers"
         coord_histo = compute_coord_histograms(data_1st,
@@ -337,7 +426,7 @@ def main(cfgfile):
                                 max_ions=int(g["max_ions"]))
 
         print "Regex Macrostate Occupancy"
-        counts_regex_1st = regex_counter(data_1st, data_regex_1st,
+        counts_regex_1st = state_counter(data_1st, data_regex_1st,
                                          range(len(regexs)),
                                          traj_col=int(g["traj_col"]))
 
@@ -354,7 +443,7 @@ def main(cfgfile):
         print "State Transition Counting"
         data_state_trans = state_transitions(data_1st, data_regex_1st,
                                              traj_col=int(g["traj_col"]))
-        print data_state_trans
+        #print data_state_trans
 
         # Extract only the mean occupancies in percent (2nd last entry)
         data_f_mean_pop = counts_regex_1st[0]["MEAN"]
@@ -419,13 +508,13 @@ def main(cfgfile):
         counts_2nd = occ_counter(data_2nd,
                                  num_cols=int(g["num_cols_per_ion"]),
                                  traj_col=int(g["traj_col"]),
-                                 sf_col=[],
-                                 prefix=g["out_prefix_2nd"]+"chanocc")
+                                 sf_col=[])
+        #                         prefix=g["out_prefix_2nd"]+"chanocc")
 
         occ_2nd = compute_occ_vs_time(data_2nd,
                                       num_cols=int(g["num_cols_per_ion"]),
-                                      traj_col=int(g["traj_col"]),
-                                      prefix=g["out_prefix_2nd"]+"chanocc")
+                                      traj_col=int(g["traj_col"]))
+        #                              prefix=g["out_prefix_2nd"]+"chanocc")
 
         ion_ts_2nd = compute_ion_timeseries(data_2nd,
                                            int(g["sort_col"]),
@@ -467,6 +556,8 @@ def main(cfgfile):
                                           num_cols=int(g["num_cols_per_ion"]),
                                           sort_col=int(g["sort_col"]),
                                           prefix=g["out_prefix_1st"]+"1dhisto")
+
+    print "Made it passed 2nd"
 
     # Extract all properties needed for both shell coordination studies.
     try:
@@ -512,7 +603,7 @@ def main(cfgfile):
                                 max_ions=int(g["max_ions"]))
 
         print "Regex Macrostate Occupancy"
-        counts_regex_both = regex_counter(data_both, data_regex_both,
+        counts_regex_both = state_counter(data_both, data_regex_both,
                                      range(len(regexs)),
                                      traj_col=int(g["traj_col"]))
 
@@ -527,11 +618,10 @@ def main(cfgfile):
         print "State Transition Counting"
         data_state_trans = state_transitions(data_both, data_regex_both,
                                              traj_col=int(g["traj_col"]))
-        print data_state_trans
 
         # Extract only the mean occupancies in percent (2nd last entry)
         data_f_mean_pop = counts_regex_both[0]["MEAN"]
-        print data_f_mean_pop
+        #print data_f_mean_pop
 
         print "State Transition Graph Building and Writing"
         #print data_state_trans
@@ -570,13 +660,13 @@ def main(cfgfile):
         counts_both = occ_counter(data_both,
                                  num_cols=int(g["num_cols_per_ion"]),
                                  traj_col=int(g["traj_col"]),
-                                 sf_col=[],
-                                 prefix=g["out_prefix_both"]+"chanocc")
+                                 sf_col=[])
+        #                         prefix=g["out_prefix_both"]+"chanocc")
 
         occ_both = compute_occ_vs_time(data_both,
                                       num_cols=int(g["num_cols_per_ion"]),
-                                      traj_col=int(g["traj_col"]),
-                                      prefix=g["out_prefix_both"]+"chanocc")
+                                      traj_col=int(g["traj_col"]))
+        #                              prefix=g["out_prefix_both"]+"chanocc")
 
         ion_ts_both = compute_ion_timeseries(data_both,
                                            int(g["sort_col"]),
@@ -632,7 +722,6 @@ def main(cfgfile):
                                           prefix=g["out_prefix_1st"]+"1dhisto")
 
         print "Preparing plots for Stacked Histogram"
-        p = ConfigMap(cfgfile, 'plot_config')
 
         plot_bindingmode_histograms(group_histo_1st,
                                     group_histo_2nd,
