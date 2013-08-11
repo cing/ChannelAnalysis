@@ -48,15 +48,16 @@ def compute_rotamer_histogram(data_lines, dihedral_cols,
 # This writes Chi1 vs Chi2 distributions (or vice versa) in the form of a
 # 2D histogram.
 def compute_rotamer_rotamer_histogram(data_lines,
-                                    dihedral_cols_x, dihedral_cols_y,
-                                    histmin=0, histmax=360, histbins=250,
-                                    prefix=None, kBT=0.596):
+                                    chi1_cols, chi2_cols,
+                                    kBT=0.596, max_eng=7.0,
+                                    histmin=0, histmax=360, histbins=180,
+                                    prefix=None):
 
     dihedral_vals_x = []
     dihedral_vals_y = []
     for line in data_lines:
-        dihedral_vals_x.extend([line[col] for col in dihedral_cols_x])
-        dihedral_vals_y.extend([line[col] for col in dihedral_cols_y])
+        dihedral_vals_x.extend([line[col] for col in chi1_cols])
+        dihedral_vals_y.extend([line[col] for col in chi2_cols])
 
     histo, xedges, yedges = histogram2d(dihedral_vals_x,
                                         dihedral_vals_y,
@@ -64,18 +65,21 @@ def compute_rotamer_rotamer_histogram(data_lines,
                                                [histmin,histmax]],
                                         bins=[histbins,histbins], normed=True)
 
+    # Since we're taking the log, remove all 0.0 values.
+    low_val_indices = histo <= 0.0
+    high_val_indices = histo > 0.0
+    histo[low_val_indices] = max_eng
+    histo[high_val_indices] = -kBT*log(histo[high_val_indices])
+
+    # Everything must be shifted such that 0 is the true minimum value.
+    min_val = min(histo[high_val_indices])
+    histo[high_val_indices] = histo[high_val_indices] - abs(min_val)
+
     if prefix != None:
-        with open(prefix+"_dihedrals_pmf","w") as out:
-            for xbin in range(histbins):
-                for ybin in range(histbins):
-                    if histo[xbin][ybin] > 0:
-                        out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
-                                  str(histo[xbin][ybin])+" "+
-                                  str(-kBT*log(histo[xbin][ybin]))+"\n")
-                    else:
-                        out.write(str(xedges[xbin])+" "+str(yedges[ybin])+" "+
-                                  str(histo[xbin][ybin])+" "+"11.0\n")
-                out.write("\n")
+        with open(prefix + "_rotamer","w") as out:
+            for xval, yval, zval in zip(xedges, yedges, histo):
+                out.write(str(xval) + " " +
+                          str(yval) + " " + str(zval) + "\n")
 
     return (histo, xedges, yedges)
 
