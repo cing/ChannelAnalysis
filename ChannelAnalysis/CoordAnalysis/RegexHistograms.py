@@ -25,13 +25,12 @@
 from argparse import ArgumentParser
 from collections import defaultdict
 from numpy import histogram
-from itertools import product
-from re import match
 from ChannelAnalysis.CoordAnalysis.Preprocessor import *
 
 def compute_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
                            sort_col=3, max_ions=3, traj_col=11, histmin=-1.50,
-                           histmax=1.5, histbins=300, prefix=None):
+                           histmax=1.5, histbins=300, prefix=None,
+                           histcount_cut=200):
 
     # This is an epic datatype with the 1st key as the regex string
     # of interest, the 2nd key is the ion number within that grouping
@@ -57,24 +56,25 @@ def compute_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
     # all the necessary histograms.
     for coord_col, coord_dict in coord_sortvals.iteritems():
 
-        combined_sort_vals = []
+        #combined_sort_vals = []
         for coord_int, sort_vals in coord_dict.iteritems():
 
-            combined_sort_vals.extend(sort_vals)
-            histo, edges = histogram(sort_vals, range=[histmin, histmax],
-                                     bins=histbins, normed=False)
+            if len(sort_vals) > histcount_cut:
+                #combined_sort_vals.extend(sort_vals)
+                histo, edges = histogram(sort_vals, range=[histmin, histmax],
+                                         bins=histbins, normed=False)
 
-            if prefix != None:
-                # Print out histograms separately for each ion
-                with open(prefix+"_regex"+str(coord_col)+
-                                 "_ion"+str(coord_int),"w") as out:
-                    for xval, yval in zip(edges,histo):
-                        out.write(str(xval)+" "+str(yval)+"\n")
+                if prefix != None:
+                    # Print out histograms separately for each ion
+                    with open(prefix+"_regex"+str(coord_col)+
+                                     "_ion"+str(coord_int),"w") as out:
+                        for xval, yval in zip(edges,histo):
+                            out.write(str(xval)+" "+str(yval)+"\n")
 
-            hist_per_regex[str(coord_col)+
-                               "_"+str(coord_int)].append(histo)
-            z_per_regex[str(coord_col)+"_"+str(coord_int)].append(edges)
+                hist_per_regex[str(coord_col)].append(histo)
+                z_per_regex[str(coord_col)].append(edges)
 
+        '''
         # Compute a histogram for all ions to act as an envelope
         histo, edges = histogram(combined_sort_vals, range=[histmin, histmax],
                                      bins=histbins, normed=False)
@@ -87,6 +87,7 @@ def compute_regex_histograms(data_floats, data_regex, num_cols=13, pad_col=4,
 
         hist_per_regex[str(coord_col)+"_ALL"].append(histo)
         z_per_regex[str(coord_col)+"_ALL"].append(edges)
+        '''
 
     return (dict(hist_per_regex), dict(z_per_regex))
 
