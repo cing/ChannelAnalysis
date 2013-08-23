@@ -24,6 +24,31 @@
 from argparse import ArgumentParser
 from numpy import histogram, histogram2d, log
 from ChannelAnalysis.RotamerAnalysis.Preprocessor import *
+from collections import defaultdict
+
+# This returns the sort_column as a time series, useful
+# for making scatterplot time series of ionic positions.
+def compute_dihedral_timeseries(data_lines, dihedral_cols, traj_col,
+                                prefix=None):
+
+    # These are dictionaries of dict where the key is the traj_number
+    # and the subdict is res_number and the value is a LIST of dihedral vals,
+    # or associated time values in the case of the associated time_per_traj
+    dihedral_per_traj = defaultdict(dict)
+    time_per_traj = defaultdict(dict)
+
+    dihedral_vals = []
+    for line in data_lines:
+        traj_id = line[traj_col]
+        for res_id, col in enumerate(dihedral_cols):
+            if res_id not in dihedral_per_traj[traj_id]:
+                dihedral_per_traj[traj_id][res_id] = [line[col]]
+                time_per_traj[traj_id][res_id] = [line[0]]
+            else:
+                dihedral_per_traj[traj_id][res_id].append(line[col])
+                time_per_traj[traj_id][res_id].append(line[0])
+
+    return (dict(dihedral_per_traj), dict(time_per_traj))
 
 # This writes chi1 or chi2 population densities in 1D
 # (kind of a weaker version of write_rotamer_rotamer_histogram below)
