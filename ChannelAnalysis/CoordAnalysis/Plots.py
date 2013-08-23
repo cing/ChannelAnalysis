@@ -456,22 +456,21 @@ def plot_iondist_histograms(iondist_histo, ion_num_cutoff=3,
             ax.plot(channel_occ_hist_x_shift, channel_occ_hist_y,
                     linewidth=2.5, label=str(occ_pairs_name[pair_id]))
 
-
-            #ax.yaxis.set_major_locator(MultipleLocator(4))
-            #ax.yaxis.set_minor_locator(MultipleLocator(2))
-            ax.xaxis.set_major_locator(MultipleLocator(2))
-            ax.xaxis.set_minor_locator(MultipleLocator(1))
-            ax.set_axisbelow(True)
-            ax.yaxis.grid(True,'minor')
-            ax.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-            ax.xaxis.grid(True,'minor')
-            ax.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-            ax.set_ylabel(str(occ_id)+" Ion Pair Dens.")
-            plt.setp(ax.get_yticklabels(), visible=False)
-            plt.setp(ax.get_xticklabels(), visible=False)
-            l = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-            for t in l.get_texts():
-                t.set_fontsize(6)
+        #ax.yaxis.set_major_locator(MultipleLocator(4))
+        #ax.yaxis.set_minor_locator(MultipleLocator(2))
+        ax.xaxis.set_major_locator(MultipleLocator(2))
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.set_axisbelow(True)
+        ax.yaxis.grid(True,'minor')
+        ax.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax.xaxis.grid(True,'minor')
+        ax.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax.set_ylabel(str(occ_id)+" Ion Pair Dens.")
+        plt.setp(ax.get_yticklabels(), visible=False)
+        plt.setp(ax.get_xticklabels(), visible=False)
+        l = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        for t in l.get_texts():
+            t.set_fontsize(6)
 
     else:
         # If it's the last plot of the for loop, then give it special
@@ -521,7 +520,8 @@ def plot_ionsplit_histograms(ionsplit_histo, occ_populations,
                   "#248077","#74AD8D","#C82754","#F7BB21","#F9E2B7"]
 
     # Plot the channel oxygen distributions, however many there are.
-    for color_id, histo in enumerate(allatom_histos[::-1]):
+    for color_id, histo in enumerate(allatom_histos):
+        #for color_id, histo in enumerate(allatom_histos[::-1]):
         channel_oxy_hist_x = (array(histo[1]["ALL"][1:]))
         diff = (channel_oxy_hist_x[1]-channel_oxy_hist_x[0])/2.0
         channel_oxy_hist_x_shift = (channel_oxy_hist_x - diff)*-1
@@ -855,12 +855,15 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
                               max_coord=4,
                               max_length=500,
                               data_skip=10,
-                              hist_scale=0.4):
+                              hist_scale=0.4,
+                              ion_types_ts=None,
+                              coord_cols_map=["E177","L176"]):
 
     # This iterates over all the trajectory id's that you computed data for.
     # ion_timeseries[0] is the time values array, but any index would suffice.
     for traj_id in ion_ts_1st[0].keys():
 
+        fig = plt.figure()
         # The grid is a 2 column figure, with 2 + 6 rows.
         gs = gridspec.GridSpec(9, 2,
                                width_ratios=[4,1],
@@ -921,9 +924,25 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
                                                  reverse=False)):
             ion_ts_x = ion_ts_1st[1][traj_id][ion_id][::int(data_skip/2)]
             ion_ts_y = ion_ts_1st[0][traj_id][ion_id][::int(data_skip/2)]
-            ion_ts_x_scale = [time_conv*pos for pos in ion_ts_x]
-            ion_ts_y_flip = [-1*pos for pos in ion_ts_y]
-            ax1.scatter(ion_ts_x_scale, ion_ts_y_flip, s=1, color=colors[color_id])
+            ion_ts_x_scale = array([time_conv*pos for pos in ion_ts_x])
+            ion_ts_y_flip = array([-1*pos for pos in ion_ts_y])
+
+
+            # If ion types are passed into this array then we make a mask
+            # of all the ions with type "1" as opposed to "0", and then
+            # use that to extract all the points to replot them with a different
+            # color.
+            if ion_types_ts != None:
+                mask_of_old_ions = array(ion_types_ts[0][traj_id][ion_id][::int(data_skip/2)])==0
+                mask_of_new_ions = array(ion_types_ts[0][traj_id][ion_id][::int(data_skip/2)])==1
+                ax1.scatter(ion_ts_x_scale[mask_of_old_ions],
+                            ion_ts_y_flip[mask_of_old_ions],
+                            s=1, color=colors[color_id])
+                ax1.scatter(ion_ts_x_scale[mask_of_new_ions],
+                            ion_ts_y_flip[mask_of_new_ions], marker='^',
+                            s=1, color=colors[color_id])
+            else:
+                ax1.scatter(ion_ts_x_scale, ion_ts_y_flip, s=1, color=colors[color_id])
 
         # Plot 2 - Ion Position Histogram
         for vals, ion_z in zip(ion_histo_1st[0][traj_id], ion_histo_1st[1][traj_id]):
@@ -1127,7 +1146,7 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
         ax5.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
         ax5.xaxis.grid(True,'minor')
         ax5.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax5.set_ylabel("E\n1st")
+        ax5.set_ylabel(coord_cols_map[0]+"\n1st")
 
         ax6.grid(True)
 
@@ -1142,7 +1161,7 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
         ax7.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
         ax7.xaxis.grid(True,'minor')
         ax7.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax7.set_ylabel("L\n1st")
+        ax7.set_ylabel(coord_cols_map[1]+"\n1st")
 
         ax8.grid(True)
 
@@ -1157,7 +1176,7 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
         ax9.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
         ax9.xaxis.grid(True,'minor')
         ax9.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax9.set_ylabel("E\n2nd")
+        ax9.set_ylabel(coord_cols_map[0]+"\n2nd")
 
         ax10.grid(True)
 
@@ -1172,7 +1191,7 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
         ax11.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
         ax11.xaxis.grid(True,'minor')
         ax11.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax11.set_ylabel("L\n2nd")
+        ax11.set_ylabel(coord_cols_map[1]+"\n2nd")
         ax11.set_xlabel("Time (ns)")
 
         ax12.grid(True)
@@ -1188,13 +1207,13 @@ def plot_sf_w_2res_timeseries(channel_occ, channel_counts,
         ax13.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
         ax13.xaxis.grid(True,'minor')
         ax13.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
-        ax13.set_ylabel("E\nBoth")
+        ax13.set_ylabel(coord_cols_map[0]+"\nBoth")
 
         ax14.grid(True)
 
         ax15.set_yticks(range(0,max_coord+1,2))
         ax15.set_ylim([-0.5,max_coord+0.5])
-        ax15.set_ylabel("L\nBoth")
+        ax15.set_ylabel(coord_cols_map[1]+"\nBoth")
         ax15.yaxis.set_major_locator(MultipleLocator(2))
         ax15.yaxis.set_minor_locator(MultipleLocator(1))
         ax15.xaxis.set_major_locator(MultipleLocator(50))
@@ -1267,6 +1286,8 @@ def plot_sf_w_3res_timeseries(channel_occ, channel_counts,
     # This iterates over all the trajectory id's that you computed data for.
     # ion_timeseries[0] is the time values array, but any index would suffice.
     for traj_id in ion_ts_1st[0].keys():
+
+        fig = plt.figure()
 
         # The grid is a 2 column figure, with 2 + 6 rows.
         gs = gridspec.GridSpec(11, 2,
@@ -1755,6 +1776,8 @@ def plot_sf_w_4res_timeseries(channel_occ, channel_counts,
     # This iterates over all the trajectory id's that you computed data for.
     # ion_timeseries[0] is the time values array, but any index would suffice.
     for traj_id in ion_ts_1st[0].keys():
+
+        fig = plt.figure()
 
         # The grid is a 2 column figure, with 2 + 6 rows.
         gs = gridspec.GridSpec(13, 2,
