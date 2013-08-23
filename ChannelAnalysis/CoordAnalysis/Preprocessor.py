@@ -337,7 +337,7 @@ def write_columns(data_lines, outfile=None, write_mode="w"):
 # it takes raw data as input. Note that this outputs a sorted list.
 def species_columns(filenames, resid_col=12, sort_col=3,
                     all_possible_states=[0,1], max_ions=3,
-                    num_cols=13, remove_frames=0,
+                    num_cols=13, remove_frames=0, sf_col=None,
                     plus2minus=True, add_time=False):
 
     data_output = []
@@ -366,21 +366,35 @@ def species_columns(filenames, resid_col=12, sort_col=3,
 
         for line in data_raw_split:
             chunked_line = chunker(line,num_cols)
-            num_ions = len(line)/num_cols
+
+            # This is created for each line because we don't know
+            # if the ion is necessarily bound to the SF.
+            num_ions = 0
 
             temp_line = []
             # Sort by the float of the sort_col column number and take
             # the deepest max_ions. Usually the outer ions aren't interesting.
             for ion in sorted(chunked_line,
                               key=lambda col: float(col[sort_col]),
-                              reverse=plus2minus)[:max_ions]:
+                              reverse=plus2minus): #[:max_ions]:
 
                 # This is the secret sauce of this method,
                 # merge_coordination files have a last decimal place that
                 # encodes an ion species this is lost when the conversion
                 # to integer takes place in the normal process_input
                 # function.
-                temp_line.append(ion[resid_col][-1])
+                if sf_col != None:
+                    if sum([float(ion[col]) for col in sf_col]) > 0:
+                        num_ions += 1
+                        temp_line.append(ion[resid_col][-1])
+                else:
+                    num_ions += 1
+                    temp_line.append(ion[resid_col][-1])
+
+                # A little messy, but we want to keep getting ions
+                # if they exist, if we've hit a maximum, then we're done.
+                if num_ions == max_ions:
+                    break
 
             # Pad the rest with with hyphens
             for filler in range(max_ions-num_ions):

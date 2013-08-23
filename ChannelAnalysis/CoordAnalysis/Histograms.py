@@ -52,6 +52,34 @@ def compute_ion_timeseries(data_lines, sort_col, traj_col,
 
     return (dict(ion_pos_per_traj), dict(time_per_traj))
 
+# This returns the species data as a time series, useful
+# for making scatterplot time series of ionic positions with different
+# marker styles to denote the atom types.
+def compute_species_timeseries(data_lines, species_lines, traj_col,
+                               max_ions_for_species=3, pad_col=4, num_cols=13):
+
+    # These are dictionaries of dict where the key is the traj_number
+    # and the subdict is ion_number and te value is a LIST of ion positions,
+    # or associated time values in the case of the associated time_per_traj
+    species_per_traj = defaultdict(dict)
+    time_per_traj = defaultdict(dict)
+
+    for line, sline in zip(data_lines,species_lines):
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-" and ion_num < max_ions_for_species:
+                sort_val = int(sline[0][ion_num])
+                traj_id = ion[traj_col]
+                if ion_num not in species_per_traj[traj_id]:
+                    species_per_traj[traj_id][ion_num] = [sort_val]
+                    time_per_traj[traj_id][ion_num] = [line[0]]
+                else:
+                    species_per_traj[traj_id][ion_num].append(sort_val)
+                    time_per_traj[traj_id][ion_num].append(line[0])
+
+    return (dict(species_per_traj), dict(time_per_traj))
+
 # To accompany compute_ion_timeseries, this function computes ion
 # position histograms per ion without taking into consideration
 # the coordination or macrostate that ion is occupying.

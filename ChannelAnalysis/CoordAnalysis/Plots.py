@@ -350,6 +350,81 @@ def plot_ionsplit_2dhistograms(ionsplit_2dhisto, ion_num_cutoff=3,
 
     return True
 
+# Plots inner ion species ordering histograms.
+def plot_species_histograms(species_histo, species_map, species_populations,
+                            plot_title="Ion Species Ordering Histograms",
+                            prefix=None):
+
+    # Initialize the figure and compute the number of rows that will
+    # be needed in the figure to capture all the data.
+    fig = plt.figure()
+
+    num_rows = len(species_histo[0].keys())
+
+    for row_count, species_id in enumerate(sorted(species_histo[0].keys())):
+        spc_histos =  species_histo[0][species_id]
+        spc_xs = species_histo[1][species_id]
+
+        # For labelling purposes, generate the same combinations that
+        # will be used to title the plots
+        color_list = ["R","G","B","#663399","C","0.1","0.2","0.3",
+                      "0.4","0.5","0.6","0.7"]
+
+        # First, extract the population of the particular occupancy
+        # state, if it doesn't mean the cutoff of 0.5%< of the dataset
+        # then give it a boot!
+        spc_index = species_populations[1]["MEAN"].index(int(species_id))
+        mean_val = species_populations[0]["MEAN"][spc_index]*100
+        stderr_val = species_populations[0]["STDERR"][spc_index]*100
+
+        ax = fig.add_subplot(num_rows, 1, row_count+1)
+        for ion_id, (histo, edges) in enumerate(zip(spc_histos, spc_xs)):
+
+            channel_spc_hist_x = array(edges[1:])
+            diff = (channel_spc_hist_x[1]-channel_spc_hist_x[0])/2.0
+            channel_spc_hist_x_shift = (channel_spc_hist_x - diff)*-10
+            channel_spc_hist_y = array(histo)
+            ax.plot(channel_spc_hist_x_shift, channel_spc_hist_y,
+                    linewidth=2.5, color=color_list[ion_id])
+
+        #ax.yaxis.set_major_locator(MultipleLocator(4))
+        #ax.yaxis.set_minor_locator(MultipleLocator(2))
+        ax.xaxis.set_major_locator(MultipleLocator(2))
+        ax.xaxis.set_minor_locator(MultipleLocator(1))
+        ax.set_axisbelow(True)
+        ax.yaxis.grid(True,'minor')
+        ax.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax.xaxis.grid(True,'minor')
+        ax.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+        ax.set_ylabel(species_map[int(species_id)])
+        plt.setp(ax.get_yticklabels(), visible=False)
+        plt.setp(ax.get_xticklabels(), visible=False)
+        #l = ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        #for t in l.get_texts():
+        #    t.set_fontsize(6)
+
+        plt.text(0.15, 0.70,
+                 r"Pop: {:.1f}% $\pm$ {:.1f}%".format(mean_val,stderr_val),
+                 ha='center', va='center', transform=ax.transAxes)
+
+    else:
+        # If it's the last plot of the for loop, then give it special
+        # treatment. Technically this could be outside the for clause...
+        plt.setp(ax.get_xticklabels(), visible=True)
+        ax.set_xlabel("Axial position (Ang)")
+
+    plt.subplots_adjust(hspace = 0.1, wspace = 0.02,
+                        left = 0.1, bottom = 0.08,
+                        right = 0.80, top = 0.93)
+    plt.suptitle(plot_title)
+
+    if prefix != None:
+        plt.savefig(prefix+".pdf")
+    else:
+        plt.show()
+
+    return True
+
 # Plots ion pair distance histograms.
 def plot_iondist_histograms(iondist_histo, ion_num_cutoff=3,
                                plot_title="Ion Pair Distance Histograms",
