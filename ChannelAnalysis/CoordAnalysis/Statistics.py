@@ -22,7 +22,50 @@ from argparse import ArgumentParser
 from numpy import mean
 from scipy.stats import sem
 from collections import defaultdict
+from itertools import product
 from ChannelAnalysis.CoordAnalysis.Preprocessor import *
+
+# This will give the statistics on occupancy in any of the binding mode
+# for a given trajectory. Much like occ_counter to be honest.
+def mode_counter(data_lines, data_modes, species_id=0, species_lines=None,
+                 num_cols=13, traj_col=11, pad_col=4, sf_col=[5,6]):
+
+    # The most nested functions award goes to:
+    all_binding_modes = range(len(list(product("01",repeat=len(sf_col)))))
+
+    # This is an epic datatype that I will use to quickly build a
+    # dict of dicts where the 1st key is a trajectory number
+    # and the second key is the binding mode and the value is a
+    # count of how many times an ion in that mode was observed.
+    count_totals = defaultdict(lambda: defaultdict(int))
+
+    # Construct fake species data if nothing has passed.
+    fake_max_ions = 10
+    if species_lines == None:
+        species_lines = [["".join(["0"]*fake_max_ions),0]
+                         for x in range(len(data_modes))]
+
+    for line, sline, species_line in zip(data_lines,data_modes,species_lines):
+        traj_id = line[traj_col]
+        temp_ion_count = 0
+        for ion_num, ion in enumerate(list(chunker(line,num_cols))):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                if int(species_line[0][ion_num]) == species_id:
+                    ion_mode = sline[ion_num]
+                    count_totals[traj_id][ion_mode] += 1
+
+    # This fills zero in for all known occupancy states for all
+    # trajectories. This is useful because we do a mean
+    # across all trajectories later.
+    for traj_id in count_totals.keys():
+        for known_state in set(all_binding_modes):
+            count_totals[traj_id][known_state] += 0
+
+    # Return the list of list, the mean and standard error of mean
+    # for each trajectory in the input.
+    return count_totals_to_percents(count_totals)
 
 # This counts of the number of ions at each step and bins these based on
 # integer occupancy values. This function utilizes the traj_col variable

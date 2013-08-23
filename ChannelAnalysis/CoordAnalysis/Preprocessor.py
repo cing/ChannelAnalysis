@@ -27,6 +27,7 @@
 from argparse import ArgumentParser
 from itertools import product
 from re import match
+from itertools import permutations
 import gzip
 
 #a great helper function to iterate over chunks of a list
@@ -62,6 +63,35 @@ def add_time_column(data_floats, num_cols=13, verbose=False):
         data_output.append(temp_line)
         if verbose:
             print "\n",
+
+    return data_output
+
+# This will produce a label for each ion at a given timestep for each binding
+# mode. If the ion is not in a particular binding mode, it will be given
+# a mode of "0". In a way, it's like a less specific version of regex_columns.
+def bindingmode_columns(data_floats, sf_col=[5,6], num_cols=13, pad_col=4):
+
+    data_output = []
+
+    # Compute all the binding modes and turn them into strings
+    all_binding_modes = product("01",repeat=len(sf_col))
+    all_binding_strs = ["".join(mode) for mode in all_binding_modes]
+
+    for line in data_floats:
+        temp_line = []
+        for ion in chunker(line,num_cols):
+            # In the case that the ion grouping has a hypen
+            # we know that's a padded column and must be excluded.
+            if ion[pad_col] != "-":
+                # Extract the coordination using the columns passed
+                coords = [ion[col] for col in sf_col]
+                # The same as above but in string form with booleans
+                coords_str = "".join([str(int(coord>0)) for coord in coords])
+                temp_line.append(all_binding_strs.index(coords_str))
+            else:
+                temp_line.append("-")
+
+        data_output.append(temp_line)
 
     return data_output
 

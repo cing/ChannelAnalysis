@@ -15,7 +15,7 @@ import matplotlib as mpl
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 from matplotlib.patches import Rectangle
 from numpy import array
-from itertools import combinations
+from itertools import combinations,product
 from operator import itemgetter
 
 # Plots ion binding modes along channel axis.
@@ -636,6 +636,128 @@ def plot_oxy_timeseries(alloxygen_ts, sf_ts,
 
     return True
 
+# Just a little helper method to attach labels
+def autolabel(rects, ax):
+    # attach some text labels
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x()+rect.get_width()/2., 1.05*height, '%d'% int(100*height),
+                ha='center', va='bottom')
+
+# This prints each binding mode and the mean occupancy of each of them
+# across the dataset. Future support will be for multiple atom species.
+def plot_mode_statistics(mode_counts, sf_col, selectivityf_code,
+                         prefix=None, plot_title="Binding Mode Statistics"):
+
+    num_plots = len(mode_counts)
+
+    # Compute all the binding modes and turn them into strings
+    all_binding_modes = product("01",repeat=len(sf_col))
+    all_binding_strs = ["".join(mode) for mode in all_binding_modes]
+    all_binding_chrstrs = []
+
+    colors = ['r', 'g', 'b', 'm', 'c', 'y', 'k']
+
+    for binding_str in all_binding_strs:
+        temp_str = []
+        temp_bool = True
+        for coord_index, coord_res in enumerate(binding_str):
+            if int(coord_res) > 0:
+                temp_bool=False
+                temp_str.append(selectivityf_code[coord_index])
+        if temp_bool:
+            temp_str.append("N/A")
+        all_binding_chrstrs.append("".join(temp_str))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+
+    width = 0.35
+    for ion_num, ion_species in enumerate(mode_counts):
+        data_mean_y = ion_species[0]["MEAN"]
+        data_mean_x = ion_species[1]["MEAN"]
+        data_stderr = ion_species[0]["STDERR"]
+
+        rects = ax.bar(array(data_mean_x)+width*ion_num, data_mean_y, width,
+                        color=colors[ion_num], yerr=data_stderr)
+
+        autolabel(rects, ax)
+
+
+    ax.set_xticklabels( tuple(all_binding_chrstrs) )
+
+    plt.subplots_adjust(hspace = 0.1, wspace = 0.02,
+                        left = 0.1, bottom = 0.08,
+                        right = 0.95, top = 0.93)
+    plt.suptitle(plot_title+" - Mean Vals")
+
+    if prefix != None:
+        plt.savefig(prefix+".pdf")
+    else:
+        plt.show()
+
+    plt.close()
+
+
+# This plots a stacked timeseries of dihedral values over time. Useful
+# for correlating with the oxygen timeseries above.
+def plot_dihedral_timeseries(dihe_ts,
+                             time_conv=0.02,
+                             prefix=None,
+                             plot_title="Dihedral Timeseries",
+                             max_length=500,
+                             data_skip=10):
+
+    colors = ['r', 'g', 'b', 'm', 'c', 'y', 'k']
+
+    # This iterates over all the trajectory id's that you computed data for.
+    # ion_timeseries[0] is the time values array, but any index would suffice.
+    for traj_id in dihe_ts[0].keys():
+
+        # Initialize the figure and compute the number of rows that will
+        # be needed in the figure to capture all the data.
+        fig = plt.figure()
+
+        # This should be 4 in the general case, not exactly sure though...
+        #num_plots = len(dihe_ts[0][0][0])
+        num_plots = 4
+
+        for color_id, res_id in enumerate(sorted(dihe_ts[0][traj_id].keys())):
+            ax = fig.add_subplot(num_plots,1,res_id+1)
+            atom_ts_x = dihe_ts[1][traj_id][res_id][::int(data_skip)]
+            atom_ts_x_scale = array([time_conv*pos for pos in atom_ts_x])
+            atom_ts_y = dihe_ts[0][traj_id][res_id][::int(data_skip)]
+
+            ax.scatter(atom_ts_x_scale, atom_ts_y, s=0.5, color=colors[color_id])
+            ax.set_ylim([0, 360])
+            ax.set_xlim([-5,max_length+5])
+            ax.set_xticks(range(0, int(50*round(max_length/50)), 50))
+            ax.yaxis.set_major_locator(MultipleLocator(60.0))
+            ax.yaxis.set_minor_locator(MultipleLocator(30.0))
+            ax.yaxis.grid(True,'minor')
+            ax.yaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+            ax.xaxis.grid(True,'minor')
+            ax.xaxis.grid(True,'major', linewidth=0.5, linestyle='-')
+            ax.set_ylabel("Chain "+str(color_id+1)+ " Angle")
+            plt.setp(ax.get_xticklabels(), visible=False)
+
+        plt.setp(ax.get_xticklabels(), visible=True)
+        ax.set_xlabel("Time (ns)")
+
+
+        plt.subplots_adjust(hspace = 0.1, wspace = 0.02,
+                            left = 0.1, bottom = 0.08,
+                            right = 0.95, top = 0.93)
+        plt.suptitle(plot_title+" - Traj "+str(traj_id))
+
+        if prefix != None:
+            plt.savefig(prefix+"_"+str(traj_id)+".pdf")
+        else:
+            plt.show()
+
+        plt.close()
+
+    return True
 
 # This plots a stacked timeseries of trajectory properties in the main column
 # and histograms of this data in a second column. Sorry for the god-awful
