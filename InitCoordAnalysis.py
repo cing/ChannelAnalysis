@@ -61,6 +61,17 @@ def main(cfgfile):
                                          remove_frames=int(r["remove_frames"]),
                                          traj_col=int(r["traj_col"]))
 
+        dihe_ts = compute_dihedral_timeseries(data_rotamers,
+                                              chi2_cols,
+                                              int(r["traj_col"]))
+
+        plot_dihedral_timeseries(dihe_ts,
+                       time_conv=float(p["time_conv"]),
+                       prefix=p["out_prefix_plot"]+"figure10",
+                       plot_title=p["fig_title_prefix"]+" Dihedral Timeseries",
+                       max_length=int(p["max_length"]),
+                       data_skip=int(p["data_skip"]))
+
         # Same thing but now we pass the SF column list.
         data_f_states = label_states(data_rotamers,
                                      chi2_cols,
@@ -68,7 +79,6 @@ def main(cfgfile):
 
         label_stats = label_statistics(data_f_states)
 
-        '''
         print "Computing dunking populations"
         dunking_counts = rotamer_counter(data_rotamers,
                                          data_f_states,
@@ -78,7 +88,6 @@ def main(cfgfile):
                                           data_f_states,
                                           traj_col=int(r["traj_col"]))
         #                                  prefix=r["out_prefix_rot"]+"rotamer")
-        '''
 
         rotamer_2dhisto = compute_rotamer_rotamer_histogram(data_rotamers,
                                                            chi1_cols=chi1_cols,
@@ -86,9 +95,7 @@ def main(cfgfile):
 
         plot_rotamer_2dhistograms(rotamer_2dhisto, state_dividers, label_stats,
                     prefix=p["out_prefix_plot"]+"figure8",
-                    plot_title=p["fig_title_prefix"]+" N181 Chi1-Chi2 Histograms")
-
-    raise " "
+                    plot_title=p["fig_title_prefix"]+" E177 Chi1-Chi2 Histograms")
 
     # Extract SF residue time series information
     try:
@@ -259,6 +266,8 @@ def main(cfgfile):
                                           col_skip=int(o["col_skip"]),
                                           num_cols=int(o["num_cols_per_ion"])))
 
+    '''
+    # This block produces plots for oxygen sliding timeseries data.
     print "Preparing plots for Oxygen Histograms"
     p = ConfigMap(cfgfile, 'plot_config')
 
@@ -268,6 +277,62 @@ def main(cfgfile):
                      plot_title=p["fig_title_prefix"]+" E,L Oxygen Timeseries",
                      max_coord=int(p["max_coord"]),
                      max_length=int(p["max_length"]))
+    '''
+
+    # Extract all species information if it exists
+    try:
+        g = ConfigMap(cfgfile, 'coord_config')
+        #print g
+        filenames_1st = ConfigMap(cfgfile, 'coord_1st_input_files').values()
+        filenames_1st_pre = [g["input_file_prefix"] +
+                             name for name in filenames_1st]
+
+        # These are plot variables that are unfortunately required at this time
+        p = ConfigMap(cfgfile, 'plot_config')
+        species_map = p["species_map"].split(",")
+    except:
+        print "No species data specified"
+    else:
+
+        data_1st = process_input(filenames=filenames_1st_pre,
+                                 num_cols=int(g["num_cols_per_ion"]),
+                                 max_ions=int(g["max_ions"]),
+                                 remove_frames=int(g["remove_frames"]),
+                                 traj_col=int(g["traj_col"]),
+                                 sort_col=int(g["sort_col"]),
+                                 add_time=str2bool(g["add_time"]),
+                                 padded=True)
+
+        # When computing species histograms, the max_ions must be
+        # set to max_ions_for_species, otherwise you'll get too fine of detail.
+        data_species = species_columns(filenames=filenames_1st_pre,
+                               resid_col=int(g["resid_col"]),
+                               sort_col=int(g["sort_col"]),
+                               max_ions=int(g["max_ions_for_species"]),
+                               num_cols=int(g["num_cols_per_ion"]),
+                               remove_frames=int(g["remove_frames"]),
+                               add_time=str2bool(g["add_time"]),
+                               sf_col=None)
+
+        print "Writing 1D histograms for species coordination labels"
+        species_histo = compute_regex_histograms(data_1st, data_species,
+                                          traj_col=int(g["traj_col"]),
+                                          num_cols=int(g["num_cols_per_ion"]),
+                                          max_ions=int(g["max_ions"]),
+                                          sort_col=int(g["sort_col"]),
+                                          prefix=g["out_prefix_1st"]+"1dhisto",
+                                          histcount_cut=400)
+
+        print "Computing species statistics"
+        species_populations = state_counter(data_1st,
+                                        data_species,
+                                        range(len(species_map)),
+                                        traj_col=int(g["traj_col"]))
+
+        plot_species_histograms(species_histo, species_map,
+                                species_populations,
+                                prefix=p["out_prefix_plot"]+"figure9",
+           plot_title=p["fig_title_prefix"]+" Ion Species Ordering Histograms")
 
     # Extract all properties needed for 1st shell coordination studies.
     try:
@@ -290,6 +355,10 @@ def main(cfgfile):
         p = ConfigMap(cfgfile, 'plot_config')
         regexs_map = p["regex_map"].split(",")
 
+        # These are plot variables to select what time series will be
+        # rendered in the plot generation.
+        plot_coord_cols = [int(col) for col in p["plot_coord_cols"].split(",")]
+
     except:
         print "No 1st shell data specified or no coordination columns found"
     else:
@@ -302,6 +371,54 @@ def main(cfgfile):
                                  sort_col=int(g["sort_col"]),
                                  add_time=str2bool(g["add_time"]),
                                  padded=True)
+
+        # Species computation, no additional parameters need to be specified.
+        data_species = species_columns(filenames=filenames_1st_pre,
+                               resid_col=int(g["resid_col"]),
+                               sort_col=int(g["sort_col"]),
+                               max_ions=int(g["max_ions"]),
+                               num_cols=int(g["num_cols_per_ion"]),
+                               remove_frames=int(g["remove_frames"]),
+                               add_time=str2bool(g["add_time"]),
+                               sf_col=None)
+
+        print "Computing binding mode statistics"
+        all_binding_modes = product("01",repeat=len(sf_cols))
+        all_binding_strs = ["".join(mode) for mode in all_binding_modes]
+        print "Binding mode IDs are: ", all_binding_strs
+
+        bindingmode_1st = bindingmode_columns(data_1st,
+                                           sf_col=sf_cols,
+                                           num_cols=int(g["num_cols_per_ion"]))
+
+        modecounts_1st_species0 = mode_counter(data_1st, bindingmode_1st,
+                                      sf_col=sf_cols, species_id=0,
+                                      species_lines=data_species,
+                                      traj_col=int(g["traj_col"]),
+                                      num_cols=int(g["num_cols_per_ion"]))
+
+        modecounts_1st_species1 = mode_counter(data_1st, bindingmode_1st,
+                                      sf_col=sf_cols, species_id=1,
+                                      species_lines=data_species,
+                                      traj_col=int(g["traj_col"]),
+                                      num_cols=int(g["num_cols_per_ion"]))
+
+        modecounts_species = [modecounts_1st_species0, modecounts_1st_species1]
+
+        plot_mode_statistics(modecounts_species, sf_cols, selectivityf_code,
+                            prefix=p["out_prefix_plot"]+"figure12",
+                            plot_title=p["fig_title_prefix"]+" 1st Shell")
+
+
+
+
+
+        raise " "
+
+        species_ts = compute_species_timeseries(data_1st, data_species,
+                               int(g["traj_col"]),
+                               num_cols=int(g["num_cols_per_ion"]),
+                               max_ions_for_species=int(g["max_ions"]))
 
         iondist_histo = compute_iondist_histograms(data_1st,
                                                 int(g["sort_col"]),
@@ -366,25 +483,31 @@ def main(cfgfile):
                                                     int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]))
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[0]]
+
         ion_ts_e_1st = compute_ion_timeseries(data_1st,
-                                          int(g["sort_col"])+2,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_e_1st = compute_position_histograms(data_1st,
-                                           int(g["sort_col"])+2,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
                                            histbins=7)
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[1]]
+
         ion_ts_l_1st = compute_ion_timeseries(data_1st,
-                                          int(g["sort_col"])+4,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_l_1st = compute_position_histograms(data_1st,
-                                           int(g["sort_col"])+4,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
@@ -449,6 +572,7 @@ def main(cfgfile):
         data_f_mean_pop = counts_regex_1st[0]["MEAN"]
         print data_f_mean_pop
 
+        '''
         print "State Transition Graph Building and Writing"
         #print data_state_trans
 
@@ -482,7 +606,7 @@ def main(cfgfile):
         print state_intermediate_transitions(data_1st, data_regex_1st,
                                              traj_col=int(g["traj_col"]))
 
-
+        '''
 
     # Extract all properties needed for 2nd shell coordination studies.
     try:
@@ -526,25 +650,29 @@ def main(cfgfile):
                                                     int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]))
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[0]]
         ion_ts_e_2nd = compute_ion_timeseries(data_2nd,
-                                          int(g["sort_col"])+2,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_e_2nd = compute_position_histograms(data_2nd,
-                                           int(g["sort_col"])+2,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
                                            histbins=7)
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[1]]
         ion_ts_l_2nd = compute_ion_timeseries(data_2nd,
-                                          int(g["sort_col"])+4,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_l_2nd = compute_position_histograms(data_2nd,
-                                           int(g["sort_col"])+4,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
@@ -623,6 +751,7 @@ def main(cfgfile):
         data_f_mean_pop = counts_regex_both[0]["MEAN"]
         #print data_f_mean_pop
 
+        '''
         print "State Transition Graph Building and Writing"
         #print data_state_trans
 
@@ -656,6 +785,7 @@ def main(cfgfile):
         print state_intermediate_transitions(data_both, data_regex_both,
                                              traj_col=int(g["traj_col"]))
 
+        '''
         print "Channel Occupancy and Figure 1 Calculations"
         counts_both = occ_counter(data_both,
                                  num_cols=int(g["num_cols_per_ion"]),
@@ -678,25 +808,29 @@ def main(cfgfile):
                                                     int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]))
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[0]]
         ion_ts_e_both = compute_ion_timeseries(data_both,
-                                          int(g["sort_col"])+2,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_e_both = compute_position_histograms(data_both,
-                                           int(g["sort_col"])+2,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
                                            histbins=7)
 
+        # Coordination col index calculation.
+        col_index = coord_cols[plot_coord_cols[1]]
         ion_ts_l_both = compute_ion_timeseries(data_both,
-                                          int(g["sort_col"])+4,
+                                          col_index,
                                           int(g["traj_col"]),
                                           num_cols=int(g["num_cols_per_ion"]))
 
         ion_histo_l_both = compute_position_histograms(data_both,
-                                           int(g["sort_col"])+4,
+                                           col_index,
                                            int(g["traj_col"]),
                                            num_cols=int(g["num_cols_per_ion"]),
                                            histmin=0, histmax=7,
@@ -730,6 +864,7 @@ def main(cfgfile):
                                  prefix=p["out_prefix_plot"]+"figure4",
                    plot_title=p["fig_title_prefix"]+" Binding Mode Histograms")
 
+        coord_cols_map = [selectivityf_map[col] for col in plot_coord_cols]
         plot_sf_w_2res_timeseries(occ_1st, counts_1st,
                            dunking_ts, dunking_counts,
                            ion_ts_1st, ion_histo_1st,
@@ -742,12 +877,14 @@ def main(cfgfile):
                            ion_ts_e_both, ion_histo_e_both,
                            ion_ts_l_both, ion_histo_l_both,
                            ion_ts_r, ion_histo_r,
+                           coord_cols_map=coord_cols_map,
                            time_conv=float(p["time_conv"]),
                            prefix=p["out_prefix_plot"]+"figure1",
                            plot_title=p["fig_title_prefix"]+" Stacked Timeseries",
                            max_coord=int(p["max_coord"]),
-                           max_length=int(p["max_length"]))
-
+                           max_length=int(p["max_length"]),
+                           data_skip=int(p["data_skip"]),
+                           ion_types_ts=species_ts)
 
 if __name__ == '__main__':
     cfgfile = ConfigParser()
