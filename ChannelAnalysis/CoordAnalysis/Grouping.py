@@ -174,7 +174,8 @@ if __name__ == '__main__':
                                        max_ions=args.max_ions,
                                        num_cols=args.num_cols,
                                        remove_frames=args.remove_frames,
-                                       add_time=args.add_time)
+                                       add_time=args.add_time,
+                                       sf_col=None)
 
         print "Species State Occupancy hardcoded for 2 ion species"
         all_species_orders = ["-"*args.max_ions]
@@ -193,5 +194,8 @@ if __name__ == '__main__':
                             traj_col=args.traj_col)
 
         for traj_id, block in species_results[0].iteritems():
-            print traj_id, block
+            print traj_id,
+            for percent in block:
+                print "%.3f" % (percent),
+            print "\n",
 
